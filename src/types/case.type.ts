@@ -73,7 +73,9 @@ export type TCase = {
   id: string;
   case_number: string;
   file_number: string;
+  stages: string;
   case_stage: TCaseStage;
+  case_status: string;
   case_description: string;
   case_date?: string; // original case date from backend
   court_id: string;
