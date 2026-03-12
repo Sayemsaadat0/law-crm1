@@ -9,7 +9,7 @@ import PaymentPanel from "@/components/pageComponent/cases/PaymentPanel";
 import CaseTimeline from "@/components/pageComponent/cases/CaseTimeline";
 import PaymentForm from "@/components/pageComponent/cases/PaymentForm";
 import HearingForm from "@/components/pageComponent/cases/HearingForm";
-import type { TCase, Hearing } from "@/types/case.type";
+import type { TCase, TCaseStage, Hearing } from "@/types/case.type";
 import { casesApi, type CaseListItem } from "@/lib/api";
 import { toast } from "sonner";
 

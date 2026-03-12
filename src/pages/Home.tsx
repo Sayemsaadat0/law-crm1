@@ -5,7 +5,7 @@ import { FileText, Calendar, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { casesApi, dashboardApi, type CaseListItem, type DashboardStats } from "@/lib/api";
-import type { TCase } from "@/types/case.type";
+import type { TCase, TCaseStage } from "@/types/case.type";
 import {
   PieChart,
   Pie,
