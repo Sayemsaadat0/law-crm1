@@ -20,14 +20,11 @@ import { usersApi, casesApi, courtsApi, type UserListItem, type Court } from "@/
 import { Calendar, User, FileText, Scale, CheckCircle2, UserCircle, Gavel, MessageSquare } from "lucide-react";
 
 const caseBasicInfoSchema = z.object({
-  // Only these two are strictly required
   number_of_file: z.string().min(1, "Number of file is required"),
   number_of_case: z.string().min(1, "Number of case is required"),
-
-  // Everything else is optional at primary info step
   date: z.string().optional(),
   court_id: z.string().optional(),
-  status: z.enum(["active", "disposed", "left"]).optional(),
+  status: z.enum(["active", "disposed", "resolve", "archive"]).optional(),
   // Optional textual stage description
   stage: z.string().optional(),
   // New appellant/respondent fields
@@ -62,9 +59,9 @@ const CaseBasicInfoForm = ({
     defaultValues: instance || {
       number_of_file: "",
       number_of_case: "",
-      status: "active",
       date: "",
       court_id: "",
+      status: undefined,
       stage: "",
       appellant_name: "",
       appellant_relation: undefined,
@@ -127,19 +124,9 @@ const CaseBasicInfoForm = ({
       if (!isActive) return;
 
       // Prepare payload for API (convert to backend field names/types)
-      const payload = {
-        date: data.date || undefined,
-        lawyer_id: data.lawyer_id ? Number(data.lawyer_id) : undefined,
+      const payload: any = {
         number_of_file: Number(data.number_of_file),
         number_of_case: Number(data.number_of_case),
-        court_id: data.court_id ? Number(data.court_id) : undefined,
-        status: data.status || "active",
-        stages: data.stage || undefined,
-        appellant_name: data.appellant_name || undefined,
-        appellant_relation: data.appellant_relation || undefined,
-        respondent_name: data.respondent_name || undefined,
-        respondent_relation: data.respondent_relation || undefined,
-        description: data.breakdowns,
       };
 
       // Only include optional fields if they have values
@@ -202,7 +189,7 @@ const CaseBasicInfoForm = ({
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Date (optional) */}
+          {/* Date */}
           <div className="space-y-2">
             <Label htmlFor="date" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-blue-600" />
@@ -221,7 +208,7 @@ const CaseBasicInfoForm = ({
             )}
           </div>
 
-          {/* Lawyer (optional at this step) */}
+          {/* Lawyer */}
           <div className="space-y-2">
             <Label htmlFor="lawyer_id" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <User className="w-4 h-4 text-blue-600" />
@@ -300,7 +287,7 @@ const CaseBasicInfoForm = ({
             )}
           </div>
 
-          {/* Court (optional at this step) */}
+          {/* Court */}
           <div className="space-y-2">
             <Label htmlFor="court_id" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <Scale className="w-4 h-4 text-blue-600" />
@@ -341,7 +328,7 @@ const CaseBasicInfoForm = ({
             )}
           </div>
 
-          {/* Status (optional at this step) */}
+          {/* Status */}
           <div className="space-y-2">
             <Label htmlFor="status" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-blue-600" />
@@ -349,7 +336,7 @@ const CaseBasicInfoForm = ({
             </Label>
             <Select
               value={form.watch("status") || ""}
-              onValueChange={(value: "active" | "disposed" | "left") => {
+              onValueChange={(value: "active" | "disposed" | "resolve" | "archive") => {
                 form.setValue("status", value);
                 form.trigger("status");
               }}
@@ -360,7 +347,8 @@ const CaseBasicInfoForm = ({
               <SelectContent>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="disposed">Disposed</SelectItem>
-                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="resolve">Resolve</SelectItem>
+                <SelectItem value="archive">Archive</SelectItem>
               </SelectContent>
             </Select>
             {form.formState.errors.status && (
@@ -382,7 +370,7 @@ const CaseBasicInfoForm = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Stage (optional free text) */}
+          {/* Stage */}
           <div className="space-y-2">
             <Label htmlFor="stage" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <FileText className="w-4 h-4 text-purple-600" />
@@ -396,7 +384,7 @@ const CaseBasicInfoForm = ({
             />
           </div>
 
-          {/* Case Summary (optional at this step) */}
+          {/* Case Summary */}
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="breakdowns" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-purple-600" />
@@ -427,7 +415,7 @@ const CaseBasicInfoForm = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* First party: Name & Relation */}
+          {/* Appellant Name */}
           <div className="space-y-2">
             <Label htmlFor="appellant_name" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <UserCircle className="w-4 h-4 text-green-600" />
@@ -435,16 +423,17 @@ const CaseBasicInfoForm = ({
             </Label>
             <Input
               id="appellant_name"
-              placeholder="Enter name"
+              placeholder="Enter appellant name"
               className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
               {...form.register("appellant_name")}
             />
           </div>
 
+          {/* Appellant Relation */}
           <div className="space-y-2">
             <Label htmlFor="appellant_relation" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <UserCircle className="w-4 h-4 text-green-600" />
-              Relation
+           Relation
             </Label>
             <Select
               value={form.watch("appellant_relation") || ""}
@@ -464,7 +453,7 @@ const CaseBasicInfoForm = ({
             </Select>
           </div>
 
-          {/* Second party: Name & Relation */}
+          {/* Respondent Name */}
           <div className="space-y-2">
             <Label htmlFor="respondent_name" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <UserCircle className="w-4 h-4 text-green-600" />
@@ -472,16 +461,17 @@ const CaseBasicInfoForm = ({
             </Label>
             <Input
               id="respondent_name"
-              placeholder="Enter name"
+              placeholder="Enter respondent name"
               className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
               {...form.register("respondent_name")}
             />
           </div>
 
+          {/* Respondent Relation */}
           <div className="space-y-2">
             <Label htmlFor="respondent_relation" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <UserCircle className="w-4 h-4 text-green-600" />
-              Relation
+           Relation
             </Label>
             <Select
               value={form.watch("respondent_relation") || ""}

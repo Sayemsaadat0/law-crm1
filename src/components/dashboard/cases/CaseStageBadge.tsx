@@ -7,7 +7,8 @@ type CaseStageBadgeProps = {
 const stageStyles: Record<TCaseStage, string> = {
   Active: "bg-primary/10 text-primary border-primary/20",
   Disposed: "bg-red-100 text-red-800 border-red-200",
-  Left: "bg-orange-100 text-orange-800 border-orange-200",
+  Resolve: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  Archive: "bg-gray-200 text-gray-800 border-gray-300",
 };
 
 export function CaseStageBadge({ stage }: CaseStageBadgeProps) {

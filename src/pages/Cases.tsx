@@ -4,36 +4,21 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { CaseStageBadge } from "@/components/dashboard/cases/CaseStageBadge";
 import { CaseActionDropdown } from "@/components/dashboard/cases/CaseActionDropdown";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import HearingForm from "@/components/pageComponent/cases/HearingForm";
 import PaymentForm from "@/components/pageComponent/cases/PaymentForm";
-import type { TCase, TCaseStage } from "@/types/case.type";
+import type { TCase } from "@/types/case.type";
 import { casesApi, type CaseListItem } from "@/lib/api";
 import { toast } from "sonner";
-
-// Debounce hook
-const useDebounce = (value: string, delay: number) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
 
 // Tab array with title and value
 const caseTabs = [
   { title: "All", value: "" },
   { title: "Active", value: "active" },
   { title: "Disposed", value: "disposed" },
+  { title: "Archive", value: "archive" },
 ];
 
 // Helper function to map API case to TCase
@@ -58,70 +43,56 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
     : [];
   const payments = Array.isArray(paymentsRaw)
     ? paymentsRaw.map((p: any) => ({
-        paid_amount: p.amount,
-        paid_date: p.date,
-      }))
+    paid_amount: p.amount,
+    paid_date: p.date,
+    }))
     : [];
 
-  // Map stages field directly to case_stage
-  // The stages field is free-text, but we need to map it to valid TCaseStage values
-  let caseStage: TCaseStage = "Active"; // default
-
-  if (apiCase.stages) {
-    const stageUpper = apiCase.stages.toUpperCase();
-    if (stageUpper === "DISPOSED") {
-      caseStage = "Disposed";
-    } else if (stageUpper === "LEFT") {
-      caseStage = "Left";
-    } else {
-      // For other stages (WS, Filing, Hearing, etc.), keep as "Active"
-      caseStage = "Active";
-    }
-  }
+  // Map stages/status to UI case stage
+  const stageMap: Record<string, "Active" | "Disposed" | "Resolve" | "Archive"> = {
+    active: "Active",
+    disposed: "Disposed",
+    resolve: "Resolve",
+    archive: "Archive",
+    // Backwards compatibility for legacy 'left' status
+    left: "Archive",
+  };
 
   return {
     id: String(apiCase.id),
     case_number: apiCase.number_of_case,
-    file_number:
-      String((apiCase as any).number_of_file ?? apiCase.file_number ?? "") ||
-      "",
-    stages: apiCase.stages || "",
-    case_stage: caseStage,
-    case_status: (apiCase as any).status || "active", // Add original status from API
+    file_number: apiCase.file_number || "",
+    case_stage: stageMap[apiCase.stages?.toLowerCase() || "active"] || "Active",
     case_description: apiCase.description || "",
     case_date: apiCase.date || "",
     court_id: apiCase.court_id ? String(apiCase.court_id) : "",
-    court_details: apiCase.court
-      ? {
-          id: String(apiCase.court.id),
-          name: apiCase.court.name,
-          address: apiCase.court.address,
-        }
-      : {
-          id: "",
-          name: "",
-          address: "",
-        },
+    court_details: apiCase.court ? {
+      id: String(apiCase.court.id),
+      name: apiCase.court.name,
+      address: apiCase.court.address,
+    } : {
+      id: "",
+      name: "",
+      address: "",
+    },
     lawyer_id: apiCase.lawyer_id ? String(apiCase.lawyer_id) : "",
-    lawyer_details: apiCase.lawyer
-      ? {
-          id: String(apiCase.lawyer.id),
-          name: apiCase.lawyer.name,
-          email: apiCase.lawyer.email || "",
-          phone: apiCase.lawyer.mobile || "",
-          address: "",
-          details: "",
-          thumbnail: apiCase.lawyer.image || "",
-        }
-      : {
-          id: "",
-          name: "N/A",
-          email: "",
-          phone: "",
-          address: "",
-          details: "",
-          thumbnail: "",
-        },
+    lawyer_details: apiCase.lawyer ? {
+      id: String(apiCase.lawyer.id),
+      name: apiCase.lawyer.name,
+      email: apiCase.lawyer.email || "",
+      phone: apiCase.lawyer.mobile || "",
+      address: "",
+      details: "",
+      thumbnail: apiCase.lawyer.image || "",
+    } : {
+      id: "",
+      name: "",
+      email: "",
+      phone: "",
+      address: "",
+      details: "",
+      thumbnail: "",
+    },
     client_id: firstClient ? String(firstClient.id) : "",
     client_details: firstClient
       ? {
@@ -155,23 +126,23 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
           })(),
         }
       : {
-          id: "",
-          name: "",
-          email: "",
-          phone: "",
-          address: "",
-          details: "",
-          thumbnail: "",
-          account_number: "",
-          account_name: "",
-          account_id: "",
-          description: "",
-          branch: "",
-          referring_firm: "",
-          client_reference_number: "",
-          billing_bank_name: "",
-          fee_schedule_files: [],
-        },
+      id: "",
+      name: "",
+      email: "",
+      phone: "",
+      address: "",
+      details: "",
+      thumbnail: "",
+      account_number: "",
+      account_name: "",
+      account_id: "",
+      description: "",
+      branch: "",
+      referring_firm: "",
+      client_reference_number: "",
+      billing_bank_name: "",
+      fee_schedule_files: [],
+    },
     // Parties are no longer used on the list view; keep fields but leave empty
     party_id: "",
     party_details: {
@@ -185,14 +156,14 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
       reference: "",
     },
     // New case side information from API
-    appellant: apiCase.appellant_name ? {
-      name: apiCase.appellant_name,
+    appellant: {
+      name: apiCase.appellant_name || "",
       relation: apiCase.appellant_relation || "",
-    } : undefined,
-    respondent: apiCase.respondent_name ? {
-      name: apiCase.respondent_name,
+    },
+    respondent: {
+      name: apiCase.respondent_name || "",
       relation: apiCase.respondent_relation || "",
-    } : undefined,
+    },
     hearings,
     payments,
   };
@@ -202,7 +173,6 @@ export default function CasesPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearchQuery = useDebounce(searchQuery, 500); // 500ms delay
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [cases, setCases] = useState<TCase[]>([]);
@@ -212,29 +182,28 @@ export default function CasesPage() {
     per_page: 15,
     total: 0,
   });
-  
   const [hearingDialogOpen, setHearingDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<TCase | null>(null);
 
-  // Fetch cases - simplified
-  const fetchCases = useCallback(async () => {
+  // Fetch cases
+  const fetchCases = useCallback(async (page = 1) => {
     try {
       setIsLoading(true);
+      const stages = activeTab || undefined;
       
-      const filters = {
-        search: debouncedSearchQuery || undefined,
-        status: activeTab || undefined,
+      const response = await casesApi.getAll({
+        search: searchQuery || undefined,
+        stages,
         with_clients: true,
         with_hearings: true,
         with_payments: true,
         per_page: 15,
-        page: currentPage,
-      };
-
-      const response = await casesApi.getAll(filters);
+        page,
+      });
 
       if (response.data) {
+        // Map all cases returned from API (no filtering)
         const mappedCases = response.data.data.map(mapApiCaseToTCase);
         setCases(mappedCases);
         setPagination({
@@ -250,17 +219,21 @@ export default function CasesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchQuery, activeTab, currentPage]);
+  }, [activeTab, searchQuery]);
 
-  // Simple effect to fetch cases when dependencies change
+  // Effects
   useEffect(() => {
-    fetchCases();
-  }, [fetchCases]);
+    fetchCases(currentPage);
+  }, [currentPage, fetchCases]);
 
-  // Reset to page 1 when search query changes
+  // Debounce search and reset filters
   useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchQuery]);
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, activeTab]);
 
   const handleNewHearing = (caseData: TCase) => {
     setSelectedCase(caseData);
@@ -282,38 +255,34 @@ export default function CasesPage() {
 
   const handleHearingCreated = () => {
     // Refresh cases so that new hearing is reflected in previous/next date & payment status
-    fetchCases();
+    fetchCases(currentPage);
   };
 
   const handlePaymentCreated = () => {
     // Refresh cases so that payment status is updated
-    fetchCases();
+    fetchCases(currentPage);
   };
 
   // Get previous and next hearing dates
   const getPreviousDate = (caseItem: TCase): string => {
     if (!caseItem.hearings || caseItem.hearings.length === 0) return "N/A";
-    const sortedHearings = [...caseItem.hearings].sort(
-      (a, b) =>
-        new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime(),
+    const sortedHearings = [...caseItem.hearings].sort((a, b) => 
+      new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime()
     );
-    const pastHearings = sortedHearings.filter(
-      (h) => new Date(h.hearing_date) < new Date(),
+    const pastHearings = sortedHearings.filter(h => 
+      new Date(h.hearing_date) < new Date()
     );
     if (pastHearings.length === 0) return "N/A";
-    return new Date(
-      pastHearings[pastHearings.length - 1].hearing_date,
-    ).toLocaleDateString();
+    return new Date(pastHearings[pastHearings.length - 1].hearing_date).toLocaleDateString();
   };
 
   const getNextDate = (caseItem: TCase): string => {
     if (!caseItem.hearings || caseItem.hearings.length === 0) return "N/A";
-    const sortedHearings = [...caseItem.hearings].sort(
-      (a, b) =>
-        new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime(),
+    const sortedHearings = [...caseItem.hearings].sort((a, b) => 
+      new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime()
     );
-    const futureHearings = sortedHearings.filter(
-      (h) => new Date(h.hearing_date) >= new Date(),
+    const futureHearings = sortedHearings.filter(h => 
+      new Date(h.hearing_date) >= new Date()
     );
     if (futureHearings.length === 0) return "N/A";
     return new Date(futureHearings[0].hearing_date).toLocaleDateString();
@@ -321,12 +290,8 @@ export default function CasesPage() {
 
   // Calculate payment status
   const getPaymentStatus = (caseItem: TCase): string => {
-    if (!caseItem.payments || caseItem.payments.length === 0)
-      return "No Payment";
-    const totalPaid = caseItem.payments.reduce(
-      (sum, p) => sum + p.paid_amount,
-      0,
-    );
+    if (!caseItem.payments || caseItem.payments.length === 0) return "No Payment";
+    const totalPaid = caseItem.payments.reduce((sum, p) => sum + p.paid_amount, 0);
     return totalPaid > 0 ? `Paid: ${totalPaid}` : "No Payment";
   };
 
@@ -349,9 +314,9 @@ export default function CasesPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
           <TabsList className="h-10 bg-white rounded-xl shadow-sm border border-gray-200 p-1.5 gap-1.5">
             {caseTabs.map((tab) => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
+              <TabsTrigger 
+                key={tab.value} 
+                value={tab.value} 
                 className="h-8 px-4 rounded-lg font-medium text-sm transition-all bg-transparent text-gray-700 hover:bg-gray-50 data-[state=active]:bg-primary-green data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
               >
                 {tab.title}
@@ -371,11 +336,6 @@ export default function CasesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-4 py-2 w-80 lg:w-96 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary h-9"
             />
-            {searchQuery !== debouncedSearchQuery && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -394,10 +354,10 @@ export default function CasesPage() {
                     SL
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
-                    Case No
+                    Case Id
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
-                    File No
+                    Number of Case
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
                     Appellant
@@ -413,9 +373,6 @@ export default function CasesPage() {
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
                     Case Stage
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
-                    Status
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
                     Payment Status
@@ -435,7 +392,7 @@ export default function CasesPage() {
                 {cases.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={11}
+                      colSpan={10}
                       className="px-3 py-8 text-center text-sm text-muted-foreground"
                     >
                       No cases found
@@ -454,10 +411,7 @@ export default function CasesPage() {
                       >
                         <td className="px-3 py-2.5">
                           <span className="text-xs font-medium text-muted-foreground">
-                            {(pagination.current_page - 1) *
-                              pagination.per_page +
-                              index +
-                              1}
+                            {(pagination.current_page - 1) * pagination.per_page + index + 1}
                           </span>
                         </td>
 
@@ -470,14 +424,17 @@ export default function CasesPage() {
                               <p className="text-xs font-medium">
                                 {caseItem.case_number}
                               </p>
+                              {caseItem.file_number && (
+                                <p className="text-xs text-muted-foreground">
+                                  {caseItem.file_number}
+                                </p>
+                              )}
                             </div>
                           </Link>
                         </td>
 
                         <td className="px-3 py-2.5">
-                          <p className="text-xs font-medium">
-                            {caseItem.file_number}
-                          </p>
+                          <p className="text-xs font-medium">{caseItem.case_number}</p>
                         </td>
 
                         <td className="px-3 py-2.5">
@@ -515,37 +472,15 @@ export default function CasesPage() {
                         </td>
 
                         <td className="px-3 py-2.5">
-                          <p className="text-xs text-muted-foreground">
-                            {previousDate}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{previousDate}</p>
                         </td>
 
                         <td className="px-3 py-2.5">
-                          <p className="text-xs text-muted-foreground">
-                            {nextDate}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{nextDate}</p>
                         </td>
 
                         <td className="px-3 py-2.5">
-                          {caseItem.stages}
-                          {/* <CaseStageBadge stage={caseItem.case_stage} /> */}
-                        </td>
-
-                        <td className="px-3 py-2.5">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              caseItem.case_status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : caseItem.case_status === "disposed"
-                                  ? "bg-red-100 text-red-800"
-                                  : caseItem.case_status === "archive"
-                                    ? "bg-gray-100 text-gray-800"
-                                    : "bg-orange-100 text-orange-800"
-                            }`}
-                          >
-                            {caseItem.case_status.charAt(0).toUpperCase() +
-                              caseItem.case_status.slice(1)}
-                          </span>
+                          <CaseStageBadge stage={caseItem.case_stage} />
                         </td>
 
                         <td className="px-3 py-2.5">
@@ -572,7 +507,7 @@ export default function CasesPage() {
                         </td>
 
                         <td className="px-3 py-2.5">
-                          {caseItem.lawyer_details.name && caseItem.lawyer_details.name !== "N/A" ? (
+                          {caseItem.lawyer_details.name ? (
                             <p className="text-xs font-medium">
                               {caseItem.lawyer_details.name}
                             </p>
@@ -605,13 +540,9 @@ export default function CasesPage() {
         {pagination.last_page > 1 && (
           <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              Showing {(pagination.current_page - 1) * pagination.per_page + 1}{" "}
-              to{" "}
-              {Math.min(
-                pagination.current_page * pagination.per_page,
-                pagination.total,
-              )}{" "}
-              of {pagination.total} results
+              Showing {(pagination.current_page - 1) * pagination.per_page + 1} to{" "}
+              {Math.min(pagination.current_page * pagination.per_page, pagination.total)} of{" "}
+              {pagination.total} results
             </div>
             <div className="flex gap-2">
               <Button
@@ -625,12 +556,8 @@ export default function CasesPage() {
               <Button
                 variant="outlineBtn"
                 size="sm"
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(pagination.last_page, p + 1))
-                }
-                disabled={
-                  pagination.current_page === pagination.last_page || isLoading
-                }
+                onClick={() => setCurrentPage((p) => Math.min(pagination.last_page, p + 1))}
+                disabled={pagination.current_page === pagination.last_page || isLoading}
               >
                 Next
               </Button>

@@ -52,20 +52,21 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
       }))
     : [];
 
-  // Map status: 'active' -> 'Active', 'disposed' -> 'Disposed', 'left' -> 'Left'
-  const statusMap: Record<string, "Active" | "Disposed" | "Left"> = {
+  // Map backend status to UI case stage
+  const statusMap: Record<string, TCaseStage> = {
     active: "Active",
     disposed: "Disposed",
-    left: "Left",
+    resolve: "Resolve",
+    archive: "Archive",
+    // legacy
+    left: "Archive",
   };
 
   return {
     id: String(apiCase.id),
-    case_number: String(apiCase.number_of_case),
-    file_number: String((apiCase as any).number_of_file ?? apiCase.file_number ?? "") || "",
-    stages: "", // Add missing property
+    case_number: apiCase.number_of_case,
+    file_number: apiCase.file_number || "",
     case_stage: statusMap[(apiCase as any).status?.toLowerCase() || "active"] || "Active",
-    case_status: (apiCase as any).status || "active", // Add missing property
     case_description: apiCase.description || "",
     case_date: apiCase.date || "",
     court_id: String(apiCase.court_id),
@@ -161,7 +162,6 @@ const Home = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [cases, setCases] = useState<TCase[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
-  console.log(dashboardStats);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -194,12 +194,8 @@ const Home = () => {
         ]);
 
         // Set dashboard stats
-        console.log('Stats response:', statsResponse);
         if (statsResponse.data) {
-          console.log('Stats response data:', statsResponse.data);
-          setDashboardStats(statsResponse.data);
-        } else {
-          console.log('No stats response data');
+          setDashboardStats(statsResponse.data.data);
         }
 
         // Process cases
@@ -324,19 +320,19 @@ const Home = () => {
     .slice(0, 10); // Limit to 10 upcoming cases
 
   // Calculate completed cases (disposed cases)
-  // const completedCasesCount = dashboardStats?.cases.disposed || 0;
+  const completedCasesCount = dashboardStats?.cases.disposed || 0;
   
   // Calculate total upcoming cases count
-  // const upcomingCasesCount = cases.filter((caseItem) => {
-  //   if (!caseItem.hearings || caseItem.hearings.length === 0) return false;
-  //   const today = new Date();
-  //   today.setHours(0, 0, 0, 0);
-  //   return caseItem.hearings.some((hearing) => {
-  //     const hearingDate = new Date(hearing.hearing_date);
-  //     hearingDate.setHours(0, 0, 0, 0);
-  //     return hearingDate >= today;
-  //   });
-  // }).length;
+  const upcomingCasesCount = cases.filter((caseItem) => {
+    if (!caseItem.hearings || caseItem.hearings.length === 0) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return caseItem.hearings.some((hearing) => {
+      const hearingDate = new Date(hearing.hearing_date);
+      hearingDate.setHours(0, 0, 0, 0);
+      return hearingDate >= today;
+    });
+  }).length;
 
   if (isLoading) {
     return (
@@ -369,9 +365,9 @@ const Home = () => {
         <h1 className="text-xl sm:text-2xl font-bold">Welcome back 👋</h1>
       </div>
 
-      {/* Stats Cards - 4 Cards Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {/* Active Cases Card - Light Blue */}
+      {/* Stats Cards - Horizontal Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        {/* Total Cases Card - Light Blue */}
         <Link to="/dashboard/cases" className="bg-linear-to-br from-blue-400 via-blue-50 to-blue-100 rounded-xl sm:rounded-2xl border-2 border-blue-300/40 shadow-lg sm:shadow-2xl hover:shadow-blue-500/20 hover:scale-[1.01] sm:hover:scale-[1.02] transition-all duration-500 p-4 sm:p-7 relative overflow-hidden group cursor-pointer block">
           {/* Animated Background Elements */}
           <div className="absolute top-0 right-0 w-32 h-32 sm:w-40 sm:h-40 bg-blue-300/40 rounded-full -mr-16 sm:-mr-20 -mt-16 sm:-mt-20 group-hover:scale-150 group-hover:bg-blue-400/50 transition-all duration-700"></div>
@@ -382,14 +378,14 @@ const Home = () => {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 sm:mb-3">
                   <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                  <p className="text-xs sm:text-sm font-semibold text-blue-700 uppercase tracking-wide">Active Cases</p>
+                  <p className="text-xs sm:text-sm font-semibold text-blue-700 uppercase tracking-wide">Total Cases</p>
                 </div>
                 <h3 className="text-3xl sm:text-5xl font-extrabold mb-1 sm:mb-2 bg-linear-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                  {dashboardStats?.cases.active || 0}
+                  {dashboardStats?.cases.total || cases.length}
                 </h3>
                 <p className="text-[10px] sm:text-xs font-medium text-blue-600/80 flex items-center gap-1">
                   <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-blue-500"></span>
-                  Currently active
+                  All registered cases
                 </p>
               </div>
               <div className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-linear-to-br from-blue-500 to-blue-600 shadow-md sm:shadow-lg group-hover:shadow-blue-500/50 group-hover:rotate-6 transition-all duration-500 border-2 border-blue-400/50">
@@ -402,29 +398,29 @@ const Home = () => {
           <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
         </Link>
 
-        {/* Total Cases Card - Light Purple */}
-        <Link to="/dashboard/cases" className="bg-linear-to-br from-purple-400 via-purple-50 to-purple-100 rounded-xl sm:rounded-2xl border-2 border-purple-300/40 shadow-lg sm:shadow-2xl hover:shadow-purple-500/20 hover:scale-[1.01] sm:hover:scale-[1.02] transition-all duration-500 p-4 sm:p-7 relative overflow-hidden group cursor-pointer block">
+        {/* Upcoming Cases Card - Light Pink */}
+        <Link to="/dashboard/cases" className="bg-linear-to-br from-pink-400 via-pink-50 to-pink-100 rounded-xl sm:rounded-2xl border-2 border-pink-300/40 shadow-lg sm:shadow-2xl hover:shadow-pink-500/20 hover:scale-[1.01] sm:hover:scale-[1.02] transition-all duration-500 p-4 sm:p-7 relative overflow-hidden group cursor-pointer block">
           {/* Animated Background Elements */}
-          <div className="absolute top-0 right-0 w-32 h-32 sm:w-40 sm:h-40 bg-purple-300/40 rounded-full -mr-16 sm:-mr-20 -mt-16 sm:-mt-20 group-hover:scale-150 group-hover:bg-purple-400/50 transition-all duration-700"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-32 sm:h-32 bg-purple-200/30 rounded-full -ml-12 sm:-ml-16 -mb-12 sm:-mb-16 group-hover:scale-125 transition-all duration-700"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 sm:w-40 sm:h-40 bg-pink-300/40 rounded-full -mr-16 sm:-mr-20 -mt-16 sm:-mt-20 group-hover:scale-150 group-hover:bg-pink-400/50 transition-all duration-700"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-32 sm:h-32 bg-pink-200/30 rounded-full -ml-12 sm:-ml-16 -mb-12 sm:-mb-16 group-hover:scale-125 transition-all duration-700"></div>
           
           <div className="relative z-10">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-purple-500 animate-pulse"></div>
-                  <p className="text-xs sm:text-sm font-semibold text-purple-700 uppercase tracking-wide">Total Cases</p>
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-pink-500 animate-pulse"></div>
+                  <p className="text-xs sm:text-sm font-semibold text-pink-700 uppercase tracking-wide">Upcoming Cases</p>
                 </div>
-                <h3 className="text-3xl sm:text-5xl font-extrabold mb-1 sm:mb-2 bg-linear-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
-                  {dashboardStats?.cases.total || 0}
+                <h3 className="text-3xl sm:text-5xl font-extrabold mb-1 sm:mb-2 bg-linear-to-r from-pink-600 to-pink-800 bg-clip-text text-transparent">
+                  {upcomingCasesCount}
                 </h3>
-                <p className="text-[10px] sm:text-xs font-medium text-purple-600/80 flex items-center gap-1">
-                  <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-purple-500"></span>
-                  All registered cases
+                <p className="text-[10px] sm:text-xs font-medium text-pink-600/80 flex items-center gap-1">
+                  <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-pink-500"></span>
+                  Scheduled hearings
                 </p>
               </div>
-              <div className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-linear-to-br from-purple-500 to-purple-600 shadow-md sm:shadow-lg group-hover:shadow-purple-500/50 group-hover:rotate-6 transition-all duration-500 border-2 border-purple-400/50">
-                <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-white" strokeWidth={2.5} />
+              <div className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-linear-to-br from-pink-500 to-pink-600 shadow-md sm:shadow-lg group-hover:shadow-pink-500/50 group-hover:rotate-6 transition-all duration-500 border-2 border-pink-400/50">
+                <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-white" strokeWidth={2.5} />
               </div>
             </div>
           </div>
@@ -433,7 +429,7 @@ const Home = () => {
           <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
         </Link>
 
-        {/* Disposed Cases Card - Light Green */}
+        {/* Completed Cases Card - Light Green */}
         <Link to="/dashboard/cases" className="bg-linear-to-br from-green-400 via-green-50 to-green-100 rounded-xl sm:rounded-2xl border-2 border-green-300/40 shadow-lg sm:shadow-2xl hover:shadow-green-500/20 hover:scale-[1.01] sm:hover:scale-[1.02] transition-all duration-500 p-4 sm:p-7 relative overflow-hidden group cursor-pointer block">
           {/* Animated Background Elements */}
           <div className="absolute top-0 right-0 w-32 h-32 sm:w-40 sm:h-40 bg-green-300/40 rounded-full -mr-16 sm:-mr-20 -mt-16 sm:-mt-20 group-hover:scale-150 group-hover:bg-green-400/50 transition-all duration-700"></div>
@@ -444,10 +440,10 @@ const Home = () => {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 sm:mb-3">
                   <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-500 animate-pulse"></div>
-                  <p className="text-xs sm:text-sm font-semibold text-green-700 uppercase tracking-wide">Disposed Cases</p>
+                  <p className="text-xs sm:text-sm font-semibold text-green-700 uppercase tracking-wide">Completed Cases</p>
                 </div>
                 <h3 className="text-3xl sm:text-5xl font-extrabold mb-1 sm:mb-2 bg-linear-to-r from-green-600 to-green-800 bg-clip-text text-transparent">
-                  {dashboardStats?.cases.disposed || 0}
+                  {completedCasesCount}
                 </h3>
                 <p className="text-[10px] sm:text-xs font-medium text-green-600/80 flex items-center gap-1">
                   <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-green-500"></span>
@@ -456,37 +452,6 @@ const Home = () => {
               </div>
               <div className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-linear-to-br from-green-500 to-green-600 shadow-md sm:shadow-lg group-hover:shadow-green-500/50 group-hover:rotate-6 transition-all duration-500 border-2 border-green-400/50">
                 <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" strokeWidth={2.5} />
-              </div>
-            </div>
-          </div>
-          
-          {/* Shine Effect */}
-          <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-        </Link>
-
-        {/* Left Cases Card - Light Orange */}
-        <Link to="/dashboard/cases" className="bg-linear-to-br from-orange-400 via-orange-50 to-orange-100 rounded-xl sm:rounded-2xl border-2 border-orange-300/40 shadow-lg sm:shadow-2xl hover:shadow-orange-500/20 hover:scale-[1.01] sm:hover:scale-[1.02] transition-all duration-500 p-4 sm:p-7 relative overflow-hidden group cursor-pointer block">
-          {/* Animated Background Elements */}
-          <div className="absolute top-0 right-0 w-32 h-32 sm:w-40 sm:h-40 bg-orange-300/40 rounded-full -mr-16 sm:-mr-20 -mt-16 sm:-mt-20 group-hover:scale-150 group-hover:bg-orange-400/50 transition-all duration-700"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-32 sm:h-32 bg-orange-200/30 rounded-full -ml-12 sm:-ml-16 -mb-12 sm:-mb-16 group-hover:scale-125 transition-all duration-700"></div>
-          
-          <div className="relative z-10">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-orange-500 animate-pulse"></div>
-                  <p className="text-xs sm:text-sm font-semibold text-orange-700 uppercase tracking-wide">Left Cases</p>
-                </div>
-                <h3 className="text-3xl sm:text-5xl font-extrabold mb-1 sm:mb-2 bg-linear-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent">
-                  {dashboardStats?.cases.left || 0}
-                </h3>
-                <p className="text-[10px] sm:text-xs font-medium text-orange-600/80 flex items-center gap-1">
-                  <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-orange-500"></span>
-                  Abandoned cases
-                </p>
-              </div>
-              <div className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-linear-to-br from-orange-500 to-orange-600 shadow-md sm:shadow-lg group-hover:shadow-orange-500/50 group-hover:rotate-6 transition-all duration-500 border-2 border-orange-400/50">
-                <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-white" strokeWidth={2.5} />
               </div>
             </div>
           </div>

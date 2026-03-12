@@ -70,7 +70,7 @@ export function SidebarNavigation() {
             <Scale className="w-5 h-5 text-black" />
           </div>
           <div>
-            <h1 className="text-sm font-bold text-white">H & H Company Court Diary</h1>
+            <h1 className="text-sm font-bold text-white">H &amp; H Company Court Diary</h1>
             <p className="text-xs text-gray-400">Case Management</p>
           </div>
         </div>

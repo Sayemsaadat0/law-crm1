@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import type { User } from '@/types/user.types';
 
 // API Configuration and utilities
@@ -330,13 +329,8 @@ export const usersApi = {
 export interface CaseListItem {
   id: number;
   number_of_case: string;
-  // Some endpoints return file_number, others return number_of_file
-  file_number?: string | number;
-  number_of_file?: string | number;
-  // Status is the canonical life-cycle field: 'active' | 'disposed' | 'archive' | 'left'
-  status?: string;
-  // Stages is now used as a free-text stage/step description (e.g. "WS")
-  stages: string;
+  file_number?: string;
+  stages: string; // 'active' | 'disposed' | 'archive' | 'left'
   description?: string;
   date?: string;
   // New meta fields for case sides
@@ -406,7 +400,6 @@ export interface CasesResponse {
 export const casesApi = {
   getAll: (params?: {
     search?: string;
-    status?: string;
     stages?: string;
     lawyer_id?: number;
     court_id?: number;
@@ -421,7 +414,6 @@ export const casesApi = {
   }) => {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.status) queryParams.append('status', params.status);
     if (params?.stages) queryParams.append('stages', params.stages);
     if (params?.lawyer_id) queryParams.append('lawyer_id', params.lawyer_id.toString());
     if (params?.court_id) queryParams.append('court_id', params.court_id.toString());
@@ -532,7 +524,8 @@ export interface DashboardStats {
     total: number;
     active: number;
     disposed: number;
-    left: number;
+    resolve: number;
+    archive: number;
   };
   case_clients: number;
   case_parties: number;
@@ -542,5 +535,5 @@ export interface DashboardStats {
 }
 
 export const dashboardApi = {
-  getStats: () => api.get<DashboardStats>('/dashboard/stats'),
+  getStats: () => api.get<{ data: DashboardStats }>('/dashboard/stats'),
 };

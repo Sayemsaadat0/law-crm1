@@ -28,7 +28,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 
-import type { TCase } from "@/types/case.type";
+import type { TCase, TCaseStage } from "@/types/case.type";
 import {
   casesApi,
   caseClientsApi,
@@ -48,18 +48,20 @@ import { toast } from "sonner";
 
 // ---------- helpers ----------
 
-// Map UI status labels to API status values
-const statusMapToApi: Record<"Active" | "Disposed" | "Left", string> = {
+const stageMapToApi: Record<TCaseStage, string> = {
   Active: "active",
   Disposed: "disposed",
-  Left: "left",
+  Resolve: "resolve",
+  Archive: "archive",
 };
 
-const statusMapFromApi: Record<string, "Active" | "Disposed" | "Left"> = {
+const stageMapFromApi: Record<string, TCaseStage> = {
   active: "Active",
   disposed: "Disposed",
-  left: "Left",
-  archive: "Disposed",
+  resolve: "Resolve",
+  archive: "Archive",
+  // legacy value
+  left: "Archive",
 };
 
 const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
@@ -90,9 +92,15 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
 
   return {
     id: String(apiCase.id),
-    case_number: String(apiCase.number_of_case),
-    file_number: String((apiCase as any).number_of_file ?? apiCase.file_number ?? "") || "",
-    case_stage: statusMapFromApi[((apiCase as any).status || "active").toLowerCase()] || "Active",
+    // Ensure numeric fields from backend are coerced to strings for the UI/forms
+    case_number: apiCase.number_of_case !== undefined && apiCase.number_of_case !== null
+      ? String(apiCase.number_of_case)
+      : "",
+    file_number:
+      (apiCase as any).file_number !== undefined && (apiCase as any).file_number !== null
+        ? String((apiCase as any).file_number)
+        : "",
+    case_stage: stageMapFromApi[apiCase.stages?.toLowerCase() || "active"] || "Active",
     case_description: apiCase.description || "",
     case_date: apiCase.date || "",
     court_id: String(apiCase.court_id),
@@ -199,28 +207,14 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
   };
 };
 
-// Normalize API date (which may include time) to YYYY-MM-DD for date inputs
-const normalizeDateForInput = (value: string | undefined | null): string => {
-  if (!value) return "";
-  // Handle formats like "2025-01-01T00:00:00Z" or "2025-01-01 00:00:00"
-  const datePart = value.split("T")[0].split(" ")[0];
-  return datePart || "";
-};
-
-// For editing, keep validation consistent with create:
-// only file number and case number are strictly required.
 const caseSchema = z.object({
-  // Required identifiers
-  number_of_file: z.string().min(1, "File number is required"),
+  date: z.string().min(1, "Date is required"),
   number_of_case: z.string().min(1, "Case number is required"),
-
-  // Optional metadata (can still be provided/edited)
-  date: z.string().optional(),
-  status: z.enum(["Active", "Disposed", "Left"]).optional(),
-  stage: z.string().optional(),
-  court_id: z.string().optional(),
-  lawyer_id: z.string().optional(),
-  description: z.string().optional(),
+  // Status shown in the UI, mapped to backend status field
+  status: z.enum(["Active", "Disposed", "Resolve", "Archive"]),
+  court_id: z.string().min(1, "Court is required"),
+  lawyer_id: z.string().min(1, "Lawyer is required"),
+  description: z.string().min(1, "Description is required"),
   // New optional fields for case sides
   appellant_name: z.string().optional(),
   appellant_relation: z.string().optional(),
@@ -295,11 +289,9 @@ export default function CaseEdit() {
 
       // Initialize forms with fetched data
       caseForm.reset({
-        date: normalizeDateForInput(mapped.case_date),
-        number_of_file: mapped.file_number || "",
+        date: mapped.case_date || "",
         number_of_case: mapped.case_number,
-        status: statusMapFromApi[((apiData as any).status || "active").toLowerCase()] || "Active",
-        stage: (apiData as any).stages || "",
+        status: mapped.case_stage,
         court_id: mapped.court_id,
         lawyer_id: mapped.lawyer_id,
         description: mapped.case_description,
@@ -369,23 +361,13 @@ export default function CaseEdit() {
     if (!rawCase || !id) return;
     try {
       const toastId = toast.loading("Updating case details...");
-
-      // Fallback to existing API values when optional fields are left empty
-      const rawAny: any = rawCase as any;
-      const currentStatusLabel =
-        statusMapFromApi[(rawAny.status || "active").toLowerCase()] || "Active";
-      const statusLabel = values.status || currentStatusLabel;
-
       await casesApi.update(Number(id), {
-        date: values.date || rawAny.date || undefined,
-        // API uses file_number on read; keep parity on update
-        file_number: values.number_of_file,
+        date: values.date,
         number_of_case: values.number_of_case,
-        status: statusMapToApi[statusLabel as "Active" | "Disposed" | "Left"],
-        stages: values.stage ?? rawAny.stages ?? null,
-        court_id: values.court_id ? Number(values.court_id) : rawCase.court_id,
-        lawyer_id: values.lawyer_id ? Number(values.lawyer_id) : rawCase.lawyer_id,
-        description: values.description ?? rawCase.description ?? "",
+        status: stageMapToApi[values.status],
+        court_id: Number(values.court_id),
+        lawyer_id: Number(values.lawyer_id),
+        description: values.description,
         appellant_name: values.appellant_name,
         appellant_relation: values.appellant_relation,
         respondent_name: values.respondent_name,
@@ -467,12 +449,16 @@ export default function CaseEdit() {
       {/* Page title - consistent with Cases.tsx */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Edit Case</h1>
-        <Link to={`/dashboard/cases/${id}`}>
-          <Button variant="outlineBtn" className="h-8 px-3 text-xs gap-1.5 inline-flex items-center">
-            <Eye className="w-3.5 h-3.5 mr-1" />
-            View details
-          </Button>
-        </Link>
+        {caseData && (
+          <Link to={`/dashboard/cases/${caseData.id}`}>
+            <Button variant="outlineBtn" className="px-3 py-3 text-xs">
+              <span className="inline-flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5" />
+                <span>View case</span>
+              </span>
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Breadcrumb - consistent with CaseDetails */}
@@ -532,18 +518,6 @@ export default function CaseEdit() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="file-number" className="text-sm">File number</Label>
-                    <Input
-                      id="file-number"
-                      placeholder="Enter file number"
-                      className="h-9 border-border"
-                      {...caseForm.register("number_of_file")}
-                    />
-                    {caseForm.formState.errors.number_of_file && (
-                      <p className="text-xs text-red-500">{caseForm.formState.errors.number_of_file.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="case-number" className="text-sm">Case number</Label>
                     <Input
                       id="case-number"
@@ -555,11 +529,11 @@ export default function CaseEdit() {
                       <p className="text-xs text-red-500">{caseForm.formState.errors.number_of_case.message}</p>
                     )}
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="status" className="text-sm">Status</Label>
                     <Select
                       value={caseForm.watch("status")}
-                      onValueChange={(v: "Active" | "Disposed" | "Left") => caseForm.setValue("status", v)}
+                      onValueChange={(v: TCaseStage) => caseForm.setValue("status", v)}
                     >
                       <SelectTrigger id="status" className="h-9 border-border">
                         <SelectValue placeholder="Select status" />
@@ -567,18 +541,10 @@ export default function CaseEdit() {
                       <SelectContent>
                         <SelectItem value="Active">Active</SelectItem>
                         <SelectItem value="Disposed">Disposed</SelectItem>
-                        <SelectItem value="Left">Left</SelectItem>
+                        <SelectItem value="Resolve">Resolve</SelectItem>
+                        <SelectItem value="Archive">Archive</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stage-text" className="text-sm">Stage</Label>
-                    <Input
-                      id="stage-text"
-                      placeholder="Enter stage (e.g. WS)"
-                      className="h-9 border-border"
-                      {...caseForm.register("stage")}
-                    />
                   </div>
                 </div>
               </div>
@@ -590,16 +556,16 @@ export default function CaseEdit() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="appellant-name" className="text-sm">Name</Label>
+                    <Label htmlFor="appellant-name" className="text-sm">Appellant name</Label>
                     <Input
                       id="appellant-name"
-                      placeholder="Name"
+                      placeholder="Appellant name"
                       className="h-9 border-border"
                       {...caseForm.register("appellant_name")}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="appellant-relation" className="text-sm">Relation</Label>
+                    <Label htmlFor="appellant-relation" className="text-sm">Appellant relation</Label>
                     <Select
                       value={caseForm.watch("appellant_relation") || undefined}
                       onValueChange={(v: string) => caseForm.setValue("appellant_relation", v)}
@@ -615,16 +581,16 @@ export default function CaseEdit() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="respondent-name" className="text-sm">Name</Label>
+                    <Label htmlFor="respondent-name" className="text-sm">Respondent name</Label>
                     <Input
                       id="respondent-name"
-                      placeholder="Name"
+                      placeholder="Respondent name"
                       className="h-9 border-border"
                       {...caseForm.register("respondent_name")}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="respondent-relation" className="text-sm">Relation</Label>
+                    <Label htmlFor="respondent-relation" className="text-sm">Respondent relation</Label>
                     <Select
                       value={caseForm.watch("respondent_relation") || undefined}
                       onValueChange={(v: string) => caseForm.setValue("respondent_relation", v)}
@@ -694,12 +660,12 @@ export default function CaseEdit() {
               </div>
 
               {/* Description */}
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="description" className="text-sm">Case description</Label>
                 <Textarea
                   id="description"
                   rows={3}
-                  className="mt-0 min-h-[88px] border-border resize-none"
+                  className="mt-2 min-h-[88px] border-border resize-none"
                   placeholder="Brief description of the case"
                   {...caseForm.register("description")}
                 />
@@ -708,8 +674,8 @@ export default function CaseEdit() {
                 )}
               </div>
 
-              <div className="flex justify-end">
-                <Button type="submit" className="bg-primary-green hover:bg-primary-green/90 text-black ">
+              <div className="flex justify-end pt-2 border-t border-border">
+                <Button type="submit" className="bg-primary-green hover:bg-primary-green/90 text-black h-9 px-4">
                   Save case changes
                 </Button>
               </div>
@@ -795,8 +761,8 @@ export default function CaseEdit() {
                 />
               </div>
 
-              <div className="flex justify-end ">
-                <Button type="submit"  className="">
+              <div className="flex justify-end pt-2 border-t border-border">
+                <Button type="submit" variant="outlineBtn" className="h-9 px-4">
                   Save client
                 </Button>
               </div>

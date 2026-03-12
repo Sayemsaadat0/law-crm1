@@ -12,7 +12,6 @@ const HEADER_HEIGHT = 28;
 // Colors (RGB 0–255) – professional, print-friendly
 const COLOR_TITLE_BG = [45, 55, 72] as const;      // slate-800
 const COLOR_ACCENT = [34, 197, 94] as const;       // green-500 (brand)
-// const COLOR_SECTION_LINE = [148, 163, 184] as const;  // slate-400
 const COLOR_LABEL = [71, 85, 105] as const;       // slate-600
 const COLOR_BODY = [30, 41, 59] as const;         // slate-800
 const COLOR_MUTED = [100, 116, 139] as const;    // slate-500
@@ -220,7 +219,6 @@ export function downloadCasePdf(caseData: TCase): void {
     const sortedHearings = [...caseData.hearings].sort(
       (a, b) => new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime()
     );
-    // const colDate = 14;
     const colTitle = 52;
     const colSerial = 130;
     // Table header
@@ -266,7 +264,6 @@ export function downloadCasePdf(caseData: TCase): void {
     doc.text("No payments recorded.", MARGIN, y);
     y += LINE_HEIGHT;
   } else {
-    // const colDate = 20;
     const colAmount = 100;
     doc.setFillColor(...COLOR_FILL);
     doc.rect(MARGIN, y - 4, CONTENT_WIDTH, 8, "F");

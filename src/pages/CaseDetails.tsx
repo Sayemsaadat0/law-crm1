@@ -20,7 +20,7 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
   const firstClient = (raw.caseClients ?? raw.case_clients)?.[0];
   const hearingsArr = raw.caseHearings ?? raw.case_hearings;
   const paymentsArr = raw.casePayments ?? raw.case_payments;
-
+ 
   const hearings =
     Array.isArray(hearingsArr)
       ? hearingsArr.map((h: any) => ({
@@ -40,18 +40,20 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
         }))
       : [];
 
-  const stageMap: Record<string, "Active" | "Disposed" | "Left"> = {
+  const stageMap: Record<string, TCaseStage> = {
     active: "Active",
     disposed: "Disposed",
-    left: "Left",
-    archive: "Disposed",
+    resolve: "Resolve",
+    archive: "Archive",
+    // legacy
+    left: "Archive",
   };
 
   return {
     id: String(apiCase.id),
     case_number: apiCase.number_of_case,
-    file_number: String((apiCase as any).number_of_file ?? apiCase.file_number ?? "") || "",
-    case_stage: stageMap[((apiCase as any).status || "active").toLowerCase()] || "Active",
+    file_number: apiCase.file_number || "",
+    case_stage: stageMap[apiCase.stages?.toLowerCase() || "active"] || "Active",
     case_description: apiCase.description || "",
     case_date: apiCase.date || "",
     court_id: String(apiCase.court_id),
