@@ -76,11 +76,9 @@ const router = createBrowserRouter([
       {
         path: "members",
         element: (
-          <RoleBasedRoute allowedRoles={['admin']}>
-            <Suspense fallback={<p>Loading...</p>}>
-              <Members />
-            </Suspense>
-          </RoleBasedRoute>
+          <Suspense fallback={<p>Loading...</p>}>
+            <Members />
+          </Suspense>
         ),
       },
       {

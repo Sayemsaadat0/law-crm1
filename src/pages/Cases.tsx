@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { CaseStageBadge } from "@/components/dashboard/cases/CaseStageBadge";
 import { CaseActionDropdown } from "@/components/dashboard/cases/CaseActionDropdown";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import HearingForm from "@/components/pageComponent/cases/HearingForm";
@@ -13,16 +12,22 @@ import type { TCase } from "@/types/case.type";
 import { casesApi, type CaseListItem } from "@/lib/api";
 import { toast } from "sonner";
 
+type CaseListRow = TCase & {
+  raw_stage: string;
+  raw_status: string;
+};
+
 // Tab array with title and value
 const caseTabs = [
   { title: "All", value: "" },
   { title: "Active", value: "active" },
   { title: "Disposed", value: "disposed" },
+  { title: "Resolve", value: "resolve" },
   { title: "Archive", value: "archive" },
 ];
 
 // Helper function to map API case to TCase
-const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
+const mapApiCaseToTCase = (apiCase: CaseListItem): CaseListRow => {
   const raw: any = apiCase as any;
 
   // Support both camelCase and snake_case relation keys from Laravel
@@ -48,21 +53,13 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
     }))
     : [];
 
-  // Map stages/status to UI case stage
-  const stageMap: Record<string, "Active" | "Disposed" | "Resolve" | "Archive"> = {
-    active: "Active",
-    disposed: "Disposed",
-    resolve: "Resolve",
-    archive: "Archive",
-    // Backwards compatibility for legacy 'left' status
-    left: "Archive",
-  };
-
   return {
     id: String(apiCase.id),
     case_number: apiCase.number_of_case,
-    file_number: apiCase.file_number || "",
-    case_stage: stageMap[apiCase.stages?.toLowerCase() || "active"] || "Active",
+    file_number: apiCase.file_number || String((raw.number_of_file ?? "")),
+    case_stage: "Active",
+    raw_stage: (apiCase.stages || "").toString(),
+    raw_status: (raw.status || "").toString(),
     case_description: apiCase.description || "",
     case_date: apiCase.date || "",
     court_id: apiCase.court_id ? String(apiCase.court_id) : "",
@@ -173,9 +170,10 @@ export default function CasesPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [cases, setCases] = useState<TCase[]>([]);
+  const [cases, setCases] = useState<CaseListRow[]>([]);
   const [pagination, setPagination] = useState({
     current_page: 1,
     last_page: 1,
@@ -190,11 +188,11 @@ export default function CasesPage() {
   const fetchCases = useCallback(async (page = 1) => {
     try {
       setIsLoading(true);
-      const stages = activeTab || undefined;
+      const status = activeTab || undefined;
       
       const response = await casesApi.getAll({
-        search: searchQuery || undefined,
-        stages,
+        search: debouncedSearchQuery || undefined,
+        status,
         with_clients: true,
         with_hearings: true,
         with_payments: true,
@@ -219,21 +217,26 @@ export default function CasesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, searchQuery]);
+  }, [activeTab, debouncedSearchQuery]);
 
   // Effects
   useEffect(() => {
     fetchCases(currentPage);
   }, [currentPage, fetchCases]);
 
-  // Debounce search and reset filters
+  // Debounce search input before calling API
   useEffect(() => {
     const timer = setTimeout(() => {
-      setCurrentPage(1);
+      setDebouncedSearchQuery(searchQuery.trim());
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, activeTab]);
+  }, [searchQuery]);
+
+  // Reset pagination when filters/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, activeTab]);
 
   const handleNewHearing = (caseData: TCase) => {
     setSelectedCase(caseData);
@@ -375,6 +378,9 @@ export default function CasesPage() {
                     Case Stage
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
+                    Status
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
                     Payment Status
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
@@ -392,7 +398,7 @@ export default function CasesPage() {
                 {cases.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={13}
                       className="px-3 py-8 text-center text-sm text-muted-foreground"
                     >
                       No cases found
@@ -480,7 +486,15 @@ export default function CasesPage() {
                         </td>
 
                         <td className="px-3 py-2.5">
-                          <CaseStageBadge stage={caseItem.case_stage} />
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                            {caseItem.raw_stage || "N/A"}
+                          </span>
+                        </td>
+
+                        <td className="px-3 py-2.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground capitalize">
+                            {caseItem.raw_status || "N/A"}
+                          </span>
                         </td>
 
                         <td className="px-3 py-2.5">

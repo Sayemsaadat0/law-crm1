@@ -400,7 +400,7 @@ export interface CasesResponse {
 export const casesApi = {
   getAll: (params?: {
     search?: string;
-    stages?: string;
+    status?: string;
     lawyer_id?: number;
     court_id?: number;
     date_from?: string;
@@ -414,7 +414,7 @@ export const casesApi = {
   }) => {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.stages) queryParams.append('stages', params.stages);
+    if (params?.status) queryParams.append('status', params.status);
     if (params?.lawyer_id) queryParams.append('lawyer_id', params.lawyer_id.toString());
     if (params?.court_id) queryParams.append('court_id', params.court_id.toString());
     if (params?.date_from) queryParams.append('date_from', params.date_from);

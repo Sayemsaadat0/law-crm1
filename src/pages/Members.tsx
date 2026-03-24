@@ -11,7 +11,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { usersApi, type UserListItem } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
-import RoleBasedRoute from "@/components/auth/RoleBasedRoute";
 
 // --------------------------
 // FORM SCHEMA
@@ -50,7 +49,7 @@ function MembersContent() {
   });
 
   const isAdmin = currentUser?.role === "admin";
-  const canManageMembers = currentUser?.role === "admin" || currentUser?.role === "owner";
+  // const canManageMembers = currentUser?.role === "admin" || currentUser?.role === "owner";
 
   const form = useForm<MemberFormType>({
     resolver: zodResolver(memberSchema),
@@ -97,21 +96,17 @@ function MembersContent() {
   // EFFECTS
   // --------------------------
   useEffect(() => {
-    if (canManageMembers) {
-      fetchMembers(currentPage);
-    }
-  }, [currentPage, fetchMembers, canManageMembers]);
+    fetchMembers(currentPage);
+  }, [currentPage, fetchMembers]);
 
   // Debounce search
   useEffect(() => {
-    if (!canManageMembers) return;
-    
     const timer = setTimeout(() => {
       setCurrentPage(1);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, canManageMembers]);
+  }, [searchQuery]);
 
   // --------------------------
   // SUBMIT HANDLER (Create Member)
@@ -203,7 +198,7 @@ function MembersContent() {
       </div>
 
       <div className={`grid grid-cols-8 gap-5`}>
-        {canManageMembers && (
+        {isAdmin && (
           <div className="col-span-2 bg-white p-6 shadow-sm rounded-xl border border-gray-200">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-gray-900">Add New Member</h2>
@@ -347,7 +342,7 @@ function MembersContent() {
         )}
 
         {/* Member Table */}
-        <div className={canManageMembers ? "col-span-6" : "col-span-8"}>
+        <div className={isAdmin ? "col-span-6" : "col-span-8"}>
           {/* Search */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mb-4">
             <div className="relative">
@@ -491,13 +486,6 @@ function MembersContent() {
   );
 }
 
-// --------------------------
-// EXPORT WITH ROLE PROTECTION
-// --------------------------
 export default function Members() {
-  return (
-    <RoleBasedRoute allowedRoles={['admin', 'owner']}>
-      <MembersContent />
-    </RoleBasedRoute>
-  );
+  return <MembersContent />;
 }
