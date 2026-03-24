@@ -523,7 +523,9 @@ const Home = () => {
               <XAxis dataKey="month" />
               <YAxis />
               <Tooltip
-                formatter={(value: number) => `৳${value.toLocaleString()}`}
+                formatter={(value) =>
+                  typeof value === "number" ? `৳${value.toLocaleString()}` : value ?? ""
+                }
               />
               <Legend />
               <Line
