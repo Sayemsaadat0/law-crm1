@@ -2,6 +2,7 @@
 
 import { FileText } from "lucide-react";
 import type { Hearing } from "@/types/case.type";
+import { formatDisplayDate } from "@/lib/utils";
 
 interface HearingsListProps {
   hearings: Hearing[];
@@ -11,17 +12,6 @@ export default function HearingsList({ hearings }: HearingsListProps) {
   const getFirstFileUrl = (file?: string | string[]) => {
     if (!file) return undefined;
     return Array.isArray(file) ? file[0] : file;
-  };
-
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
   };
 
   return (
@@ -60,7 +50,7 @@ export default function HearingsList({ hearings }: HearingsListProps) {
                     {hearing.title}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
-                    {formatDate(hearing.hearing_date)}
+                    {formatDisplayDate(hearing.hearing_date)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {hearing.details}

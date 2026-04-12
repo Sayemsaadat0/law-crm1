@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreVertical, Eye, Pencil, DollarSign, Calendar } from "lucide-react";
+import { MoreVertical, Eye, Pencil, DollarSign, Calendar, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ interface CaseActionDropdownProps {
   onEdit?: (caseData: TCase) => void;
   onReceivePayment?: (caseData: TCase) => void;
   onNewHearing?: (caseData: TCase) => void;
+  onDelete?: (caseData: TCase) => void;
 }
 
 export function CaseActionDropdown({
@@ -23,6 +24,7 @@ export function CaseActionDropdown({
   onEdit,
   onReceivePayment,
   onNewHearing,
+  onDelete,
 }: CaseActionDropdownProps) {
   return (
     <DropdownMenu>
@@ -64,6 +66,15 @@ export function CaseActionDropdown({
           >
             <Calendar className="w-4 h-4" />
             <span>New Hearings</span>
+          </DropdownMenuItem>
+        )}
+        {onDelete && (
+          <DropdownMenuItem
+            onClick={() => onDelete(caseData)}
+            className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Delete</span>
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

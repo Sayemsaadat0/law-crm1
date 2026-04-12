@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { Hearing } from "@/types/case.type";
+import { formatDisplayDate } from "@/lib/utils";
 import { casePaymentsApi } from "@/lib/api";
 
 const paymentSchema = z.object({
@@ -136,7 +137,7 @@ const PaymentForm = ({
 
   // Format hearing for display in select
   const formatHearingOption = (hearing: Hearing) => {
-    const date = new Date(hearing.hearing_date).toLocaleDateString();
+    const date = formatDisplayDate(hearing.hearing_date);
     // Format: Serial No - Title - Date
     return `${hearing.serial_no} - ${hearing.title} - ${date}`;
   };

@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Calendar, CheckCircle2 } from "lucide-react";
+import { FileText, Calendar, CheckCircle2, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { addDays, compareAsc, format, startOfDay } from "date-fns";
 import { casesApi, dashboardApi, type CaseListItem, type DashboardStats } from "@/lib/api";
+import { formatDisplayDate } from "@/lib/utils";
 import type { TCase, TCaseStage } from "@/types/case.type";
 import {
   PieChart,
@@ -158,6 +161,22 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
   };
 };
 
+/** Hearings scheduled from today (inclusive) through the next 7 days (exclusive end). */
+function isHearingInNext7Days(hearingDateStr: string, todayStart: Date): boolean {
+  const d = startOfDay(new Date(hearingDateStr));
+  const end = addDays(todayStart, 7);
+  return d >= todayStart && d < end;
+}
+
+function getEarliestHearingInWindow(caseItem: TCase, todayStart: Date): string | null {
+  const end = addDays(todayStart, 7);
+  const inWindow = (caseItem.hearings || [])
+    .map((h) => ({ d: startOfDay(new Date(h.hearing_date)), raw: h.hearing_date }))
+    .filter(({ d }) => d >= todayStart && d < end)
+    .sort((a, b) => compareAsc(a.d, b.d));
+  return inWindow[0]?.raw ?? null;
+}
+
 const Home = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [cases, setCases] = useState<TCase[]>([]);
@@ -269,10 +288,7 @@ const Home = () => {
   const monthlyRevenue = cases.reduce((acc, caseItem) => {
     caseItem.payments.forEach((payment) => {
       const date = new Date(payment.paid_date);
-      const month = date.toLocaleDateString("en-US", {
-        month: "short",
-        year: "numeric",
-      });
+      const month = format(date, "MMM yyyy");
       const existing = acc.find((item) => item.month === month);
       if (existing) {
         existing.revenue += payment.paid_amount;
@@ -288,50 +304,30 @@ const Home = () => {
     return a.date - b.date;
   });
 
-  // Get upcoming cases (cases with future hearing dates)
+  const todayStart = startOfDay(new Date());
+
+  // Upcoming cases: at least one hearing in the next 7 days
   const upcomingCases = cases
     .filter((caseItem) => {
       if (!caseItem.hearings || caseItem.hearings.length === 0) return false;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return caseItem.hearings.some((hearing) => {
-        const hearingDate = new Date(hearing.hearing_date);
-        hearingDate.setHours(0, 0, 0, 0);
-        return hearingDate >= today;
-      });
+      return caseItem.hearings.some((h) => isHearingInNext7Days(h.hearing_date, todayStart));
     })
     .sort((a, b) => {
-      // Sort by nearest hearing date
-      const getNextHearingDate = (caseItem: TCase) => {
-        if (!caseItem.hearings || caseItem.hearings.length === 0) return new Date(9999, 12, 31);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const futureHearings = caseItem.hearings
-          .map((h) => new Date(h.hearing_date))
-          .filter((d) => {
-            d.setHours(0, 0, 0, 0);
-            return d >= today;
-          });
-        if (futureHearings.length === 0) return new Date(9999, 12, 31);
-        return new Date(Math.min(...futureHearings.map((d) => d.getTime())));
-      };
-      return getNextHearingDate(a).getTime() - getNextHearingDate(b).getTime();
+      const rawA = getEarliestHearingInWindow(a, todayStart);
+      const rawB = getEarliestHearingInWindow(b, todayStart);
+      if (!rawA && !rawB) return 0;
+      if (!rawA) return 1;
+      if (!rawB) return -1;
+      return compareAsc(new Date(rawA), new Date(rawB));
     })
-    .slice(0, 10); // Limit to 10 upcoming cases
+    .slice(0, 10);
 
   // Calculate completed cases (disposed cases)
   const completedCasesCount = dashboardStats?.cases.disposed || 0;
   
-  // Calculate total upcoming cases count
   const upcomingCasesCount = cases.filter((caseItem) => {
     if (!caseItem.hearings || caseItem.hearings.length === 0) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return caseItem.hearings.some((hearing) => {
-      const hearingDate = new Date(hearing.hearing_date);
-      hearingDate.setHours(0, 0, 0, 0);
-      return hearingDate >= today;
-    });
+    return caseItem.hearings.some((h) => isHearingInNext7Days(h.hearing_date, todayStart));
   }).length;
 
   if (isLoading) {
@@ -361,8 +357,17 @@ const Home = () => {
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Welcome Section */}
-      <div className="mb-4 sm:mb-6">
+      <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl sm:text-2xl font-bold">Welcome back 👋</h1>
+        <Link to="/dashboard/cases">
+          <Button
+            type="button"
+            className="h-9 px-4 text-sm bg-primary-green text-black hover:bg-primary-green/90 gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Case
+          </Button>
+        </Link>
       </div>
 
       {/* Stats Cards - Horizontal Layout */}
@@ -461,6 +466,142 @@ const Home = () => {
         </Link>
       </div>
 
+      {/* Upcoming Cases — next 7 days (above charts) */}
+      <div className="space-y-3 sm:space-y-4">
+        <div>
+          <h2 className="text-base sm:text-lg font-semibold">Upcoming Cases</h2>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+            Hearings scheduled in the next 7 days
+          </p>
+        </div>
+        <div className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden">
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr className="bg-primary-green border-b border-gray-200">
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
+                      SL
+                    </th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
+                      Case Id
+                    </th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black hidden sm:table-cell">
+                      Number of Case
+                    </th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
+                      Next hearing
+                    </th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
+                      Case Stage
+                    </th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black hidden md:table-cell">
+                      Payment Status
+                    </th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
+                      Client
+                    </th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black hidden lg:table-cell">
+                      Party
+                    </th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
+                      Lawyer
+                    </th>
+                  </tr>
+                </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {upcomingCases.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
+                      No upcoming cases in the next 7 days
+                    </td>
+                  </tr>
+                ) : (
+                  upcomingCases.map((caseItem, index) => {
+                    const nextHearingRaw = getEarliestHearingInWindow(caseItem, todayStart);
+                  return (
+                    <tr
+                      key={caseItem.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                        <span className="text-xs sm:text-sm font-medium text-gray-700">
+                          {index + 1}
+                        </span>
+                      </td>
+
+                      <td className="px-2 sm:px-4 py-2 sm:py-3">
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <p className="text-xs sm:text-sm font-medium">
+                              {caseItem.case_number}
+                            </p>
+                            <p className="text-[10px] sm:text-xs text-gray-500">
+                              {caseItem.file_number}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 hidden sm:table-cell">
+                        <p className="text-xs sm:text-sm font-medium">
+                          {caseItem.case_number}
+                        </p>
+                      </td>
+
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                        <span className="text-xs sm:text-sm font-medium text-gray-800">
+                          {nextHearingRaw ? formatDisplayDate(nextHearingRaw) : "—"}
+                        </span>
+                      </td>
+
+                      <td className="px-2 sm:px-4 py-2 sm:py-3">
+                        <span
+                          className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border ${getStageStyle(
+                            caseItem.case_stage
+                          )}`}
+                        >
+                          {caseItem.case_stage}
+                        </span>
+                      </td>
+
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 hidden md:table-cell">
+                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium bg-gray-100 text-gray-700">
+                          N/A
+                        </span>
+                      </td>
+
+                      <td className="px-2 sm:px-4 py-2 sm:py-3">
+                        <p className="text-xs sm:text-sm font-medium">
+                          {caseItem.client_details.name}
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-gray-500">
+                          {caseItem.client_details.account_id}
+                        </p>
+                      </td>
+
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 hidden lg:table-cell">
+                        <p className="text-xs sm:text-sm font-medium">
+                          {caseItem.party_details.name}
+                        </p>
+                      </td>
+
+                      <td className="px-2 sm:px-4 py-2 sm:py-3">
+                        <p className="text-xs sm:text-sm font-medium">
+                          {caseItem.lawyer_details.name}
+                        </p>
+                      </td>
+                    </tr>
+                  );
+                  })
+                )}
+              </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Case Stage Distribution - Pie Chart */}
@@ -523,9 +664,7 @@ const Home = () => {
               <XAxis dataKey="month" />
               <YAxis />
               <Tooltip
-                formatter={(value) =>
-                  typeof value === "number" ? `৳${value.toLocaleString()}` : value ?? ""
-                }
+                formatter={(value) => `৳${Number(value ?? 0).toLocaleString()}`}
               />
               <Legend />
               <Line
@@ -559,131 +698,6 @@ const Home = () => {
               <Bar dataKey="cases" fill="#f97316" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Upcoming Cases Table - Full Width */}
-      <div className="space-y-3 sm:space-y-4">
-        <div>
-          <h2 className="text-base sm:text-lg font-semibold">
-            Upcoming Cases
-          </h2>
-        </div>
-        <div className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden">
-          <div className="overflow-x-auto -mx-2 sm:mx-0">
-            <div className="inline-block min-w-full align-middle">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr className="bg-primary-green border-b border-gray-200">
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
-                      SL
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
-                      Case Id
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black hidden sm:table-cell">
-                      Number of Case
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
-                      Case Stage
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black hidden md:table-cell">
-                      Payment Status
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
-                      Client
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black hidden lg:table-cell">
-                      Party
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-black">
-                      Lawyer
-                    </th>
-                  </tr>
-                </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {upcomingCases.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
-                      No upcoming cases found
-                    </td>
-                  </tr>
-                ) : (
-                  upcomingCases.map((caseItem, index) => {
-                  return (
-                    <tr
-                      key={caseItem.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <span className="text-xs sm:text-sm font-medium text-gray-700">
-                          {index + 1}
-                        </span>
-                      </td>
-
-                      <td className="px-2 sm:px-4 py-2 sm:py-3">
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <p className="text-xs sm:text-sm font-medium">
-                              {caseItem.case_number}
-                            </p>
-                            <p className="text-[10px] sm:text-xs text-gray-500">
-                              {caseItem.file_number}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 hidden sm:table-cell">
-                        <p className="text-xs sm:text-sm font-medium">
-                          {caseItem.case_number}
-                        </p>
-                      </td>
-
-                      <td className="px-2 sm:px-4 py-2 sm:py-3">
-                        <span
-                          className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border ${getStageStyle(
-                            caseItem.case_stage
-                          )}`}
-                        >
-                          {caseItem.case_stage}
-                        </span>
-                      </td>
-
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 hidden md:table-cell">
-                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium bg-gray-100 text-gray-700">
-                          N/A
-                        </span>
-                      </td>
-
-                      <td className="px-2 sm:px-4 py-2 sm:py-3">
-                        <p className="text-xs sm:text-sm font-medium">
-                          {caseItem.client_details.name}
-                        </p>
-                        <p className="text-[10px] sm:text-xs text-gray-500">
-                          {caseItem.client_details.account_id}
-                        </p>
-                      </td>
-
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 hidden lg:table-cell">
-                        <p className="text-xs sm:text-sm font-medium">
-                          {caseItem.party_details.name}
-                        </p>
-                      </td>
-
-                      <td className="px-2 sm:px-4 py-2 sm:py-3">
-                        <p className="text-xs sm:text-sm font-medium">
-                          {caseItem.lawyer_details.name}
-                        </p>
-                      </td>
-                    </tr>
-                  );
-                  })
-                )}
-              </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       </div>
     </div>

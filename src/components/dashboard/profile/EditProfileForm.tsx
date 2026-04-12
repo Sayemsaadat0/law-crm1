@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ import { toast } from "sonner";
 import { authApi, api } from "@/lib/api";
 import type { User } from "@/types/user.types";
 import { User2, CalendarIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayDate, formatIsoDateInput } from "@/lib/utils";
 
 const editProfileSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -84,7 +83,7 @@ export default function EditProfileForm({ user, onUpdate }: EditProfileFormProps
       };
 
       if (data.joining_date) {
-        updateData.joining_date = format(data.joining_date, "yyyy-MM-dd");
+        updateData.joining_date = formatIsoDateInput(data.joining_date);
       }
 
       if (file) {
@@ -104,7 +103,7 @@ export default function EditProfileForm({ user, onUpdate }: EditProfileFormProps
           formData.append("mobile", data.mobile);
         }
         if (data.joining_date) {
-          formData.append("joining_date", format(data.joining_date, "yyyy-MM-dd"));
+          formData.append("joining_date", formatIsoDateInput(data.joining_date));
         }
         // Append file with proper name
         formData.append("image", file, file.name);
@@ -241,7 +240,7 @@ export default function EditProfileForm({ user, onUpdate }: EditProfileFormProps
               <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
               <span className="flex-1 text-left">
                 {form.watch("joining_date") ? (
-                  format(form.watch("joining_date")!, "PPP")
+                  formatDisplayDate(form.watch("joining_date")!)
                 ) : (
                   "Pick a date (optional)"
                 )}

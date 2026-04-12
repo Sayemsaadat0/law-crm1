@@ -1,5 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { TCase } from "@/types/case.type";
+import { compareAsc } from "date-fns";
+import { formatDisplayDate, formatPartyRelationLabel } from "@/lib/utils";
 
 const MARGIN = 22;
 const PAGE_WIDTH = 210;
@@ -19,14 +21,7 @@ const COLOR_BORDER = [226, 232, 240] as const;    // slate-200
 const COLOR_FILL = [248, 250, 252] as const;      // slate-50
 
 function formatPdfDate(dateString: string): string {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  return formatDisplayDate(dateString, "N/A");
 }
 
 function setBodyText(doc: jsPDF, size = 10): void {
@@ -76,7 +71,7 @@ function addPageFooter(doc: jsPDF, pageNum: number, totalPages: number): void {
     footerY
   );
   doc.text(
-    new Date().toLocaleDateString(),
+    formatDisplayDate(new Date()),
     PAGE_WIDTH - MARGIN,
     footerY,
     { align: "right" }
@@ -169,10 +164,14 @@ export function downloadCasePdf(caseData: TCase): void {
   y += SECTION_GAP;
   y = addSectionTitle(doc, y, "PARTIES");
   y = addLabelValue(doc, y, "Appellant", caseData.appellant?.name ?? "—");
-  y = addLabelValue(doc, y, "Relation", caseData.appellant?.relation ?? "");
-  y += 2;
+  y = addLabelValue(doc, y, "Relation", formatPartyRelationLabel(caseData.appellant?.relation ?? ""));
+  y += 3;
+  setHeadingText(doc, 13);
+  doc.text("VS", PAGE_WIDTH / 2, y, { align: "center" });
+  doc.setTextColor(...COLOR_BODY);
+  y += LINE_HEIGHT + 5;
   y = addLabelValue(doc, y, "Respondent", caseData.respondent?.name ?? "—");
-  y = addLabelValue(doc, y, "Relation", caseData.respondent?.relation ?? "");
+  y = addLabelValue(doc, y, "Relation", formatPartyRelationLabel(caseData.respondent?.relation ?? ""));
   y += SECTION_GAP;
 
   // —— Court & Lawyer ——
@@ -216,8 +215,8 @@ export function downloadCasePdf(caseData: TCase): void {
     doc.text("No hearings recorded.", MARGIN, y);
     y += LINE_HEIGHT + 4;
   } else {
-    const sortedHearings = [...caseData.hearings].sort(
-      (a, b) => new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime()
+    const sortedHearings = [...caseData.hearings].sort((a, b) =>
+      compareAsc(new Date(a.hearing_date), new Date(b.hearing_date))
     );
     const colTitle = 52;
     const colSerial = 130;

@@ -16,8 +16,21 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { parseISO } from "date-fns";
 import { usersApi, casesApi, courtsApi, type UserListItem, type Court } from "@/lib/api";
-import { Calendar, User, FileText, Scale, CheckCircle2, UserCircle, Gavel, MessageSquare } from "lucide-react";
+import { cn, formatDisplayDate, formatIsoDateInput } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  CalendarDays,
+  User,
+  FileText,
+  Scale,
+  CheckCircle2,
+  UserCircle,
+  Gavel,
+  MessageSquare,
+} from "lucide-react";
 
 const caseBasicInfoSchema = z.object({
   number_of_file: z.string().min(1, "Number of file is required"),
@@ -189,18 +202,56 @@ const CaseBasicInfoForm = ({
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Date */}
+          {/* Date — Calendar + date-fns (stored as yyyy-MM-dd for API) */}
           <div className="space-y-2">
-            <Label htmlFor="date" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
+            <Label htmlFor="case-date-picker" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-blue-600" />
               Case Date
             </Label>
-            <Input
-              id="date"
-              type="date"
-              className="w-full h-11 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-              {...form.register("date")}
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  id="case-date-picker"
+                  disabled={!isActive}
+                  className={cn(
+                    "w-full h-11 px-3 text-sm rounded-md border border-gray-300 bg-white",
+                    "flex items-center justify-start text-left font-normal",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500",
+                    "disabled:pointer-events-none disabled:opacity-50",
+                    "hover:bg-gray-50/80 transition-colors",
+                    form.watch("date") ? "text-gray-900" : "text-gray-500"
+                  )}
+                >
+                  <CalendarDays className="mr-2 h-4 w-4 shrink-0 text-blue-600" />
+                  <span className="flex-1 text-left">
+                    {form.watch("date")
+                      ? formatDisplayDate(form.watch("date")!)
+                      : "Pick a date (optional)"}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto p-0 bg-white border border-gray-200 shadow-xl z-50 rounded-lg"
+                align="start"
+              >
+                <Calendar
+                  mode="single"
+                  selected={
+                    form.watch("date") && /^\d{4}-\d{2}-\d{2}$/.test(form.watch("date")!)
+                      ? parseISO(form.watch("date")!)
+                      : undefined
+                  }
+                  onSelect={(d) => {
+                    form.setValue("date", d ? formatIsoDateInput(d) : "");
+                  }}
+                  initialFocus
+                  captionLayout="dropdown"
+                  fromYear={1900}
+                  toYear={new Date().getFullYear() + 10}
+                />
+              </PopoverContent>
+            </Popover>
             {form.formState.errors.date && (
               <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
                 {form.formState.errors.date.message}
@@ -414,81 +465,98 @@ const CaseBasicInfoForm = ({
           <h3 className="text-lg font-semibold text-gray-800">Parties Information</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Appellant Name */}
-          <div className="space-y-2">
-            <Label htmlFor="appellant_name" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <UserCircle className="w-4 h-4 text-green-600" />
-              Name
-            </Label>
-            <Input
-              id="appellant_name"
-              placeholder="Enter appellant name"
-              className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
-              {...form.register("appellant_name")}
-            />
-          </div>
+        <div className="flex flex-col gap-6 md:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 md:gap-3 md:items-stretch">
+            {/* Appellant */}
+            <div className="rounded-xl border border-green-200/80 bg-white/60 p-4 space-y-4">
+              <p className="text-center text-xs font-bold uppercase tracking-wider text-green-800">
+                Appellant
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="appellant_name" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <UserCircle className="w-4 h-4 text-green-600" />
+                  Name
+                </Label>
+                <Input
+                  id="appellant_name"
+                  placeholder="Enter Name"
+                  className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
+                  {...form.register("appellant_name")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="appellant_relation" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <UserCircle className="w-4 h-4 text-green-600" />
+                  Relation
+                </Label>
+                <Select
+                  value={form.watch("appellant_relation") || ""}
+                  onValueChange={(value: "plaintiff" | "Petitioner" | "Appellant") => {
+                    form.setValue("appellant_relation", value);
+                    form.trigger("appellant_relation");
+                  }}
+                >
+                  <SelectTrigger className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20">
+                    <SelectValue placeholder="Select relation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="plaintiff">Plaintiff</SelectItem>
+                    <SelectItem value="Petitioner">Petitioner</SelectItem>
+                    <SelectItem value="Appellant">Appellant</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-          {/* Appellant Relation */}
-          <div className="space-y-2">
-            <Label htmlFor="appellant_relation" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <UserCircle className="w-4 h-4 text-green-600" />
-           Relation
-            </Label>
-            <Select
-              value={form.watch("appellant_relation") || ""}
-              onValueChange={(value: "plaintiff" | "Petitioner" | "Appellant") => {
-                form.setValue("appellant_relation", value);
-                form.trigger("appellant_relation");
-              }}
+            <div
+              className="flex items-center justify-center py-2 md:py-0 md:min-w-[3rem]"
+              aria-hidden
             >
-              <SelectTrigger className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20">
-                <SelectValue placeholder="Select relation" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="plaintiff">Plaintiff</SelectItem>
-                <SelectItem value="Petitioner">Petitioner</SelectItem>
-                <SelectItem value="Appellant">Appellant</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <span className="inline-flex items-center justify-center rounded-lg border-2 border-green-600/30 bg-green-50 px-4 py-2 text-lg font-black tracking-[0.2em] text-green-800 shadow-sm">
+                VS
+              </span>
+            </div>
 
-          {/* Respondent Name */}
-          <div className="space-y-2">
-            <Label htmlFor="respondent_name" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <UserCircle className="w-4 h-4 text-green-600" />
-              Name
-            </Label>
-            <Input
-              id="respondent_name"
-              placeholder="Enter respondent name"
-              className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
-              {...form.register("respondent_name")}
-            />
-          </div>
-
-          {/* Respondent Relation */}
-          <div className="space-y-2">
-            <Label htmlFor="respondent_relation" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <UserCircle className="w-4 h-4 text-green-600" />
-           Relation
-            </Label>
-            <Select
-              value={form.watch("respondent_relation") || ""}
-              onValueChange={(value: "defendant" | "opposite_party" | "respondent") => {
-                form.setValue("respondent_relation", value);
-                form.trigger("respondent_relation");
-              }}
-            >
-              <SelectTrigger className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20">
-                <SelectValue placeholder="Select relation" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="defendant">Defendant</SelectItem>
-                <SelectItem value="opposite_party">Opposite Party</SelectItem>
-                <SelectItem value="respondent">Respondent</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Respondent */}
+            <div className="rounded-xl border border-emerald-200/80 bg-white/60 p-4 space-y-4">
+              <p className="text-center text-xs font-bold uppercase tracking-wider text-emerald-900">
+                Respondent
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="respondent_name" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <UserCircle className="w-4 h-4 text-green-600" />
+                  Name
+                </Label>
+                <Input
+                  id="respondent_name"
+                  placeholder="Enter Name"
+                  className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
+                  {...form.register("respondent_name")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="respondent_relation" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <UserCircle className="w-4 h-4 text-green-600" />
+                  Relation
+                </Label>
+                <Select
+                  value={form.watch("respondent_relation") || ""}
+                  onValueChange={(value: "defendant" | "opposite_party" | "respondent") => {
+                    form.setValue("respondent_relation", value);
+                    form.trigger("respondent_relation");
+                  }}
+                >
+                  <SelectTrigger className="w-full h-11 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20">
+                    <SelectValue placeholder="Select relation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="defendant">Defendant</SelectItem>
+                    <SelectItem value="opposite_party">Opposite Party</SelectItem>
+                    <SelectItem value="respondent">Respondent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </div>
       </div>

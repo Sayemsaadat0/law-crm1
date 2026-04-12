@@ -2,7 +2,7 @@
 
 import { Plus, Pencil, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { compareDateWithToday } from "@/lib/utils";
+import { compareDateWithToday, formatDisplayDate, formatDisplayDateTime } from "@/lib/utils";
 import type { Hearing } from "@/types/case.type";
 
 interface CaseTimelineProps {
@@ -18,30 +18,6 @@ export default function CaseTimeline({
   onAddHearing,
   onEditHearing,
 }: CaseTimelineProps) {
-  // Format date and time
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  // Format date only
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
       {/* Header with Add Button */}
@@ -85,7 +61,7 @@ export default function CaseTimeline({
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
                     <p className="text-xs font-medium text-gray-600 mb-1">
-                      {formatDateTime(hearing.hearing_date)}
+                      {formatDisplayDateTime(hearing.hearing_date)}
                     </p>
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-xs font-semibold ">
@@ -96,7 +72,7 @@ export default function CaseTimeline({
                       </p>
                     </div>
                     <p className="text-xs text-gray-500 mb-1">
-                      Date: {formatDate(hearing.hearing_date)}
+                      Date: {formatDisplayDate(hearing.hearing_date)}
                     </p>
                     <p className="text-sm text-gray-700 mb-2">{hearing.details}</p>
                     {/* Hearing files: support single or multiple URLs */}

@@ -11,6 +11,7 @@ import PaymentForm from "@/components/pageComponent/cases/PaymentForm";
 import HearingForm from "@/components/pageComponent/cases/HearingForm";
 import type { TCase, TCaseStage, Hearing } from "@/types/case.type";
 import { casesApi, type CaseListItem } from "@/lib/api";
+import { formatDisplayDate, formatPartyRelationLabel } from "@/lib/utils";
 import { toast } from "sonner";
 
 // Local helper to map API case shape to TCase (same as in Cases.tsx)
@@ -266,16 +267,7 @@ export default function CaseDetails() {
     }
   };
 
-  // Format date for case date display
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
+  const formatDate = (dateString: string) => formatDisplayDate(dateString);
 
   return (
     <div className="space-y-6">
@@ -395,7 +387,7 @@ export default function CaseDetails() {
                     {caseData.appellant?.relation && (
                       <p className="text-gray-600 flex items-center gap-2">
                         <User className="w-4 h-4" />
-                        {caseData.appellant.relation}
+                        {formatPartyRelationLabel(caseData.appellant.relation)}
                       </p>
                     )}
                   </div>
@@ -410,7 +402,7 @@ export default function CaseDetails() {
                     {caseData.respondent?.relation && (
                       <p className="text-gray-600 flex items-center gap-2">
                         <User className="w-4 h-4" />
-                        {caseData.respondent.relation}
+                        {formatPartyRelationLabel(caseData.respondent.relation)}
                       </p>
                     )}
                   </div>

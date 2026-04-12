@@ -3,6 +3,7 @@
 import { Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Payment } from "@/types/case.type";
+import { formatDisplayDate } from "@/lib/utils";
 
 interface PaymentPanelProps {
   payments: Payment[];
@@ -11,17 +12,6 @@ interface PaymentPanelProps {
 }
 
 export default function PaymentPanel({ payments, onAddPayment, onEditPayment }: PaymentPanelProps) {
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
       {/* Header with Add Button */}
@@ -47,7 +37,7 @@ export default function PaymentPanel({ payments, onAddPayment, onEditPayment }: 
               className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <div className="flex-1">
-                <p className="text-xs text-gray-600 mb-1">{formatDate(payment.paid_date)}</p>
+                <p className="text-xs text-gray-600 mb-1">{formatDisplayDate(payment.paid_date)}</p>
                 <p className="text-sm font-semibold text-gray-900">
                   ${payment.paid_amount.toLocaleString()}
                 </p>

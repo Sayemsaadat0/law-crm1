@@ -5,11 +5,14 @@ import { Plus, Search, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CaseActionDropdown } from "@/components/dashboard/cases/CaseActionDropdown";
+import DeleteAction from "@/components/dashboard/cases/DeleteAction";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import HearingForm from "@/components/pageComponent/cases/HearingForm";
 import PaymentForm from "@/components/pageComponent/cases/PaymentForm";
 import type { TCase } from "@/types/case.type";
 import { casesApi, type CaseListItem } from "@/lib/api";
+import { compareAsc } from "date-fns";
+import { formatDisplayDate, formatPartyRelationLabel } from "@/lib/utils";
 import { toast } from "sonner";
 
 type CaseListRow = TCase & {
@@ -183,6 +186,8 @@ export default function CasesPage() {
   const [hearingDialogOpen, setHearingDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<TCase | null>(null);
+  const [caseToDelete, setCaseToDelete] = useState<TCase | null>(null);
+  const [isDeletingCase, setIsDeletingCase] = useState(false);
 
   // Fetch cases
   const fetchCases = useCallback(async (page = 1) => {
@@ -256,6 +261,25 @@ export default function CasesPage() {
     navigate(`/dashboard/cases/edit/${caseData.id}`);
   };
 
+  const handleRequestDeleteCase = (caseData: TCase) => {
+    setCaseToDelete(caseData);
+  };
+
+  const handleConfirmDeleteCase = async () => {
+    if (!caseToDelete) return;
+    setIsDeletingCase(true);
+    try {
+      await casesApi.delete(Number(caseToDelete.id));
+      toast.success("Case deleted");
+      fetchCases(currentPage);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete case");
+      throw error;
+    } finally {
+      setIsDeletingCase(false);
+    }
+  };
+
   const handleHearingCreated = () => {
     // Refresh cases so that new hearing is reflected in previous/next date & payment status
     fetchCases(currentPage);
@@ -269,26 +293,26 @@ export default function CasesPage() {
   // Get previous and next hearing dates
   const getPreviousDate = (caseItem: TCase): string => {
     if (!caseItem.hearings || caseItem.hearings.length === 0) return "N/A";
-    const sortedHearings = [...caseItem.hearings].sort((a, b) => 
-      new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime()
+    const sortedHearings = [...caseItem.hearings].sort((a, b) =>
+      compareAsc(new Date(a.hearing_date), new Date(b.hearing_date))
     );
     const pastHearings = sortedHearings.filter(h => 
       new Date(h.hearing_date) < new Date()
     );
     if (pastHearings.length === 0) return "N/A";
-    return new Date(pastHearings[pastHearings.length - 1].hearing_date).toLocaleDateString();
+    return formatDisplayDate(pastHearings[pastHearings.length - 1].hearing_date);
   };
 
   const getNextDate = (caseItem: TCase): string => {
     if (!caseItem.hearings || caseItem.hearings.length === 0) return "N/A";
-    const sortedHearings = [...caseItem.hearings].sort((a, b) => 
-      new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime()
+    const sortedHearings = [...caseItem.hearings].sort((a, b) =>
+      compareAsc(new Date(a.hearing_date), new Date(b.hearing_date))
     );
     const futureHearings = sortedHearings.filter(h => 
       new Date(h.hearing_date) >= new Date()
     );
     if (futureHearings.length === 0) return "N/A";
-    return new Date(futureHearings[0].hearing_date).toLocaleDateString();
+    return formatDisplayDate(futureHearings[0].hearing_date);
   };
 
   // Calculate payment status
@@ -451,7 +475,7 @@ export default function CasesPage() {
                               </p>
                               {caseItem.appellant.relation && (
                                 <p className="text-xs text-muted-foreground">
-                                  {caseItem.appellant.relation}
+                                  {formatPartyRelationLabel(caseItem.appellant.relation)}
                                 </p>
                               )}
                             </>
@@ -468,7 +492,7 @@ export default function CasesPage() {
                               </p>
                               {caseItem.respondent.relation && (
                                 <p className="text-xs text-muted-foreground">
-                                  {caseItem.respondent.relation}
+                                  {formatPartyRelationLabel(caseItem.respondent.relation)}
                                 </p>
                               )}
                             </>
@@ -538,6 +562,7 @@ export default function CasesPage() {
                               onEdit={handleEditCase}
                               onReceivePayment={handleReceivePayment}
                               onNewHearing={handleNewHearing}
+                              onDelete={handleRequestDeleteCase}
                             />
                           </div>
                         </td>
@@ -604,6 +629,15 @@ export default function CasesPage() {
           onCreated={handlePaymentCreated}
         />
       )}
+
+      <DeleteAction
+        open={!!caseToDelete}
+        onOpenChange={(open) => {
+          if (!open) setCaseToDelete(null);
+        }}
+        handleDeleteSubmit={handleConfirmDeleteCase}
+        isLoading={isDeletingCase}
+      />
     </div>
   );
 }

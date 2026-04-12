@@ -2,25 +2,13 @@
 
 import { User2, Calendar } from "lucide-react";
 import type { User } from "@/types/user.types";
+import { formatDisplayDate } from "@/lib/utils";
 
 interface ProfilePreviewProps {
   user: User;
 }
 
 export default function ProfilePreview({ user }: ProfilePreviewProps) {
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Profile Picture with Online Badge - Fiverr Style */}
@@ -72,9 +60,9 @@ export default function ProfilePreview({ user }: ProfilePreviewProps) {
             <div className="text-xs text-gray-500 mb-0.5">Member since</div>
             <div className="text-sm text-gray-900">
               {user.joining_date 
-                ? formatDate(user.joining_date)
+                ? formatDisplayDate(user.joining_date)
                 : user.created_at 
-                ? formatDate(user.created_at)
+                ? formatDisplayDate(user.created_at)
                 : "N/A"}
             </div>
           </div>

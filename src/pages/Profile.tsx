@@ -6,6 +6,7 @@ import ProfilePreview from "@/components/dashboard/profile/ProfilePreview";
 import EditProfileForm from "@/components/dashboard/profile/EditProfileForm";
 import ChangePasswordForm from "@/components/dashboard/profile/ChangePasswordForm";
 import { useAuthStore } from "@/store/authStore";
+import { formatDisplayDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 function Profile() {
@@ -112,11 +113,11 @@ function Profile() {
                       <div className="flex items-center justify-between py-3 border-b border-gray-100">
                         <span className="text-sm font-medium text-gray-600">Member Since</span>
                         <span className="text-sm text-gray-900">
-                          {user.joining_date 
-                            ? new Date(user.joining_date).toLocaleDateString("en-US", { year: "numeric", month: "short" })
-                            : user.created_at 
-                            ? new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short" })
-                            : "N/A"}
+                          {user.joining_date
+                            ? formatDisplayDate(user.joining_date)
+                            : user.created_at
+                              ? formatDisplayDate(user.created_at)
+                              : "N/A"}
                         </span>
                       </div>
                     )}

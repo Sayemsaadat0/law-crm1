@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CaseStageBadge } from "./CaseStageBadge";
+import { formatDisplayDate } from "@/lib/utils";
 
 interface CaseDetailsModalProps {
   isOpen: boolean;
@@ -36,13 +37,6 @@ export function CaseDetailsModal({
   caseData,
 }: CaseDetailsModalProps) {
   if (!caseData) return null;
-
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
 
   const totalPayments = caseData.payments.reduce(
     (sum, p) => sum + p.paid_amount,
@@ -190,7 +184,7 @@ export function CaseDetailsModal({
                     className="border rounded-lg p-4 bg-primary/5 border-primary/20"
                   >
                     <p className="font-semibold text-sm text-primary">
-                      {formatDate(h.hearing_date)}
+                      {formatDisplayDate(h.hearing_date)}
                     </p>
                     <p className="text-muted-foreground mt-1">{h.details}</p>
 
@@ -228,7 +222,7 @@ export function CaseDetailsModal({
                     className="flex justify-between items-center border rounded-lg p-4 bg-green-50 border-green-200"
                   >
                     <p className="text-sm font-semibold text-green-800">
-                      {formatDate(p.paid_date)}
+                      {formatDisplayDate(p.paid_date)}
                     </p>
                     <p className="text-lg font-bold">
                       ${p.paid_amount.toLocaleString()}

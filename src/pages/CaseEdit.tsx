@@ -39,6 +39,7 @@ import {
   type UserListItem,
 } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { formatDisplayDate, formatIsoDateInput } from "@/lib/utils";
 import { CaseStageBadge } from "@/components/dashboard/cases/CaseStageBadge";
 import PaymentPanel from "@/components/pageComponent/cases/PaymentPanel";
 import CaseTimeline from "@/components/pageComponent/cases/CaseTimeline";
@@ -231,10 +232,9 @@ type ClientFormValues = z.infer<typeof clientSchema>;
 
 const toInputDate = (value?: string | null) => {
   if (!value) return "";
-  // Keep only yyyy-mm-dd so native date input can render it.
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  const iso = formatIsoDateInput(value);
+  if (iso) return iso;
   if (typeof value === "string" && value.length >= 10) return value.slice(0, 10);
   return "";
 };
@@ -356,15 +356,7 @@ export default function CaseEdit() {
     navigate("/dashboard/cases");
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return "N/A";
-    return date.toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  const formatDate = (dateString: string) => formatDisplayDate(dateString, "N/A");
 
   const onCaseSubmit = async (values: CaseFormValues) => {
     if (!rawCase || !id) return;
@@ -588,56 +580,73 @@ export default function CaseEdit() {
                 <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
                   Parties
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="appellant-name" className="text-sm">Appellant name</Label>
-                    <Input
-                      id="appellant-name"
-                      placeholder="Appellant name"
-                      className="h-9 border-border"
-                      {...caseForm.register("appellant_name")}
-                    />
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 md:gap-3 md:items-stretch">
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
+                    <p className="text-center text-xs font-bold uppercase tracking-wider text-foreground">
+                      Appellant
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="appellant-name" className="text-sm">Name</Label>
+                      <Input
+                        id="appellant-name"
+                        placeholder="Enter Name"
+                        className="h-9 border-border"
+                        {...caseForm.register("appellant_name")}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="appellant-relation" className="text-sm">Relation</Label>
+                      <Select
+                        value={caseForm.watch("appellant_relation") || undefined}
+                        onValueChange={(v: string) => caseForm.setValue("appellant_relation", v)}
+                      >
+                        <SelectTrigger id="appellant-relation" className="h-9 border-border">
+                          <SelectValue placeholder="Select relation" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="plaintiff">Plaintiff</SelectItem>
+                          <SelectItem value="Petitioner">Petitioner</SelectItem>
+                          <SelectItem value="Appellant">Appellant</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="appellant-relation" className="text-sm">Appellant relation</Label>
-                    <Select
-                      value={caseForm.watch("appellant_relation") || undefined}
-                      onValueChange={(v: string) => caseForm.setValue("appellant_relation", v)}
-                    >
-                      <SelectTrigger id="appellant-relation" className="h-9 border-border">
-                        <SelectValue placeholder="Select relation" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="plaintiff">Plaintiff</SelectItem>
-                        <SelectItem value="Petitioner">Petitioner</SelectItem>
-                        <SelectItem value="Appellant">Appellant</SelectItem>
-                      </SelectContent>
-                    </Select>
+
+                  <div className="flex items-center justify-center py-2 md:py-0 md:min-w-[3rem]" aria-hidden>
+                    <span className="inline-flex items-center justify-center rounded-lg border-2 border-primary-green/40 bg-primary-green/10 px-4 py-2 text-lg font-black tracking-[0.2em] text-foreground">
+                      VS
+                    </span>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="respondent-name" className="text-sm">Respondent name</Label>
-                    <Input
-                      id="respondent-name"
-                      placeholder="Respondent name"
-                      className="h-9 border-border"
-                      {...caseForm.register("respondent_name")}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="respondent-relation" className="text-sm">Respondent relation</Label>
-                    <Select
-                      value={caseForm.watch("respondent_relation") || undefined}
-                      onValueChange={(v: string) => caseForm.setValue("respondent_relation", v)}
-                    >
-                      <SelectTrigger id="respondent-relation" className="h-9 border-border">
-                        <SelectValue placeholder="Select relation" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="defendant">Defendant</SelectItem>
-                        <SelectItem value="opposite_party">Opposite Party</SelectItem>
-                        <SelectItem value="respondent">Respondent</SelectItem>
-                      </SelectContent>
-                    </Select>
+
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
+                    <p className="text-center text-xs font-bold uppercase tracking-wider text-foreground">
+                      Respondent
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="respondent-name" className="text-sm">Name</Label>
+                      <Input
+                        id="respondent-name"
+                        placeholder="Enter Name"
+                        className="h-9 border-border"
+                        {...caseForm.register("respondent_name")}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="respondent-relation" className="text-sm">Relation</Label>
+                      <Select
+                        value={caseForm.watch("respondent_relation") || undefined}
+                        onValueChange={(v: string) => caseForm.setValue("respondent_relation", v)}
+                      >
+                        <SelectTrigger id="respondent-relation" className="h-9 border-border">
+                          <SelectValue placeholder="Select relation" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="defendant">Defendant</SelectItem>
+                          <SelectItem value="opposite_party">Opposite Party</SelectItem>
+                          <SelectItem value="respondent">Respondent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>
