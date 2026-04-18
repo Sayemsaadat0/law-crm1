@@ -12,16 +12,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { caseHearingsApi, casesApi } from "@/lib/api";
 
+/** All fields optional at validation time; title + date required only when saving a hearing. */
 const hearingCreateSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  serial_no: z.string().min(1, "Serial number is required"),
-  date: z.string().min(1, "Date is required"),
-  note: z.string().min(1, "Note is required"),
-  // Allow multiple files; we'll validate manually
+  title: z.string().max(255),
+  serial_no: z.string().max(255),
+  date: z.string(),
+  note: z.string(),
   file: z.any().optional(),
 });
 
 type HearingCreateFormType = z.infer<typeof hearingCreateSchema>;
+
+function hasHearingFiles(data: HearingCreateFormType): boolean {
+  if (!data.file) return false;
+  const files = Array.isArray(data.file) ? data.file : [data.file];
+  return files.some((f: File) => f instanceof File && f.size > 0);
+}
+
+function hasAnyHearingInput(data: HearingCreateFormType): boolean {
+  const text = [data.title, data.serial_no, data.date, data.note];
+  if (text.some((s) => String(s ?? "").trim() !== "")) return true;
+  return hasHearingFiles(data);
+}
 
 interface CaseHearingCreateFormProps {
   isActive?: boolean;
@@ -55,6 +67,45 @@ const CaseHearingCreateForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
 
+  const finishWithoutHearing = async (caseId: string) => {
+    setIsSubmitting(true);
+    try {
+      const caseResponse = await casesApi.getById(Number(caseId));
+      const caseData: unknown =
+        caseResponse.data && (caseResponse.data as { data?: unknown }).data
+          ? (caseResponse.data as { data: unknown }).data
+          : caseResponse.data;
+
+      if (!caseData) {
+        localStorage.removeItem("current_case_id");
+        toast.error("Case information not found.");
+        return;
+      }
+
+      localStorage.removeItem("current_case_id");
+      setFilePreview(null);
+      form.reset({
+        title: "",
+        serial_no: "",
+        date: "",
+        note: "",
+        file: undefined,
+      });
+
+      toast.success(
+        "Continuing without hearing details. You can add hearings later when editing the case."
+      );
+
+      if (onStepComplete) {
+        onStepComplete();
+      }
+
+      navigate("/dashboard/cases");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const onSubmit = async (data: HearingCreateFormType, mode: "complete" | "addAnother") => {
     let toastId: string | number | undefined;
     try {
@@ -66,20 +117,46 @@ const CaseHearingCreateForm = ({
         return;
       }
 
+      if (!hasAnyHearingInput(data)) {
+        if (mode === "addAnother") {
+          toast.info(
+            "Enter title and hearing date to save a hearing, or use Save & complete to finish without hearings."
+          );
+          return;
+        }
+        await finishWithoutHearing(caseId);
+        return;
+      }
+
+      if (!data.title?.trim() || !data.date) {
+        toast.error(
+          "Enter title and hearing date to save a hearing, or clear the fields to finish without one."
+        );
+        return;
+      }
+
       setIsSubmitting(true);
       toastId = toast.loading("Saving hearing information...");
 
       const formData = new FormData();
-      formData.append("title", data.title);
-      formData.append("serial_number", data.serial_no);
+      formData.append("title", data.title.trim());
       formData.append("date", data.date);
-      formData.append("note", data.note);
       formData.append("case_id", caseId);
+
+      const serial = data.serial_no?.trim();
+      if (serial) {
+        formData.append("serial_number", serial);
+      }
+
+      const note = data.note?.trim();
+      if (note) {
+        formData.append("note", note);
+      }
 
       if (data.file) {
         const files = Array.isArray(data.file) ? data.file : [data.file];
         files.forEach((file: File) => {
-          if (file) {
+          if (file && file.size > 0) {
             formData.append("files[]", file);
           }
         });
@@ -87,7 +164,6 @@ const CaseHearingCreateForm = ({
 
       await caseHearingsApi.create(formData);
 
-      // If user wants to add another hearing, just reset form and stay on this tab
       if (mode === "addAnother") {
         if (toastId !== undefined) {
           toast.success("Hearing added successfully!", { id: toastId });
@@ -106,15 +182,13 @@ const CaseHearingCreateForm = ({
         return;
       }
 
-      // After saving hearing, we can optionally validate that case exists
       const caseResponse = await casesApi.getById(Number(caseId));
-      const caseData: any =
-        caseResponse.data && (caseResponse.data as any).data
-          ? (caseResponse.data as any).data
+      const caseData: unknown =
+        caseResponse.data && (caseResponse.data as { data?: unknown }).data
+          ? (caseResponse.data as { data: unknown }).data
           : caseResponse.data;
 
       if (!caseData) {
-        // If somehow case is missing, clean up
         localStorage.removeItem("current_case_id");
         if (toastId !== undefined) {
           toast.error("Case information not found after saving hearing.", { id: toastId });
@@ -138,11 +212,12 @@ const CaseHearingCreateForm = ({
       }
 
       navigate("/dashboard/cases");
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to save hearing information";
       if (toastId !== undefined) {
-        toast.error(err.message || "Failed to save hearing information", { id: toastId });
+        toast.error(message, { id: toastId });
       } else {
-        toast.error(err.message || "Failed to save hearing information");
+        toast.error(message);
       }
     } finally {
       setIsSubmitting(false);
@@ -155,27 +230,28 @@ const CaseHearingCreateForm = ({
       form.setValue("file", files);
       setFilePreview(files.map((f) => f.name).join(", "));
     } else {
-      form.setValue("file", undefined as any);
+      form.setValue("file", undefined as unknown as File[]);
       setFilePreview(null);
     }
   };
 
-  const handleSubmitComplete = form.handleSubmit((data) =>
-    onSubmit(data, "complete")
-  );
+  const handleSubmitComplete = form.handleSubmit((data) => onSubmit(data, "complete"));
 
-  const handleSubmitAddAnother = form.handleSubmit((data) =>
-    onSubmit(data, "addAnother")
-  );
+  const handleSubmitAddAnother = form.handleSubmit((data) => onSubmit(data, "addAnother"));
 
   return (
     <form className="space-y-5" onSubmit={handleSubmitComplete}>
+      <p className="text-sm text-gray-500 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2">
+        Hearing details are optional. To save a hearing here, enter <strong>title</strong> and{" "}
+        <strong>hearing date</strong>. Leave everything blank and use{" "}
+        <strong>Save &amp; complete</strong> to finish without adding a hearing.
+      </p>
+
       {/* Title & Serial Number in a flex row */}
       <div className="flex flex-row items-center space-x-6">
-        {/* Title */}
         <div className="flex flex-col flex-1 space-y-2">
           <Label htmlFor="title" className="text-sm font-medium text-gray-700">
-            Title
+            Title <span className="text-gray-400 font-normal">(if saving a hearing)</span>
           </Label>
           <Input
             id="title"
@@ -184,16 +260,13 @@ const CaseHearingCreateForm = ({
             {...form.register("title")}
           />
           {form.formState.errors.title && (
-            <p className="text-xs text-red-500 mt-1">
-              {form.formState.errors.title.message}
-            </p>
+            <p className="text-xs text-red-500 mt-1">{form.formState.errors.title.message}</p>
           )}
         </div>
 
-        {/* Serial Number */}
         <div className="flex flex-col flex-1 space-y-2">
           <Label htmlFor="serial_no" className="text-sm font-medium text-gray-700">
-            Serial Number
+            Serial Number <span className="text-gray-400 font-normal">(optional)</span>
           </Label>
           <Input
             id="serial_no"
@@ -202,17 +275,14 @@ const CaseHearingCreateForm = ({
             {...form.register("serial_no")}
           />
           {form.formState.errors.serial_no && (
-            <p className="text-xs text-red-500 mt-1">
-              {form.formState.errors.serial_no.message}
-            </p>
+            <p className="text-xs text-red-500 mt-1">{form.formState.errors.serial_no.message}</p>
           )}
         </div>
       </div>
 
-      {/* File Upload */}
       <div className="space-y-2">
         <Label htmlFor="file" className="text-sm font-medium text-gray-700">
-          File Upload
+          File Upload <span className="text-gray-400 font-normal">(optional)</span>
         </Label>
         <div className="relative">
           <Input
@@ -223,34 +293,23 @@ const CaseHearingCreateForm = ({
             className="w-full h-10 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-green file:text-gray-900 hover:file:bg-primary-green/90"
             onChange={handleFileChange}
           />
-          {filePreview && (
-            <p className="text-xs text-gray-500 mt-1">{filePreview}</p>
-          )}
+          {filePreview && <p className="text-xs text-gray-500 mt-1">{filePreview}</p>}
         </div>
       </div>
 
-      {/* Date */}
       <div className="space-y-2">
         <Label htmlFor="date" className="text-sm font-medium text-gray-700">
-          Hearing Date
+          Hearing Date <span className="text-gray-400 font-normal">(if saving a hearing)</span>
         </Label>
-        <Input
-          id="date"
-          type="date"
-          className="w-full h-10"
-          {...form.register("date")}
-        />
+        <Input id="date" type="date" className="w-full h-10" {...form.register("date")} />
         {form.formState.errors.date && (
-          <p className="text-xs text-red-500 mt-1">
-            {form.formState.errors.date.message}
-          </p>
+          <p className="text-xs text-red-500 mt-1">{form.formState.errors.date.message}</p>
         )}
       </div>
 
-      {/* Note */}
       <div className="space-y-2">
         <Label htmlFor="note" className="text-sm font-medium text-gray-700">
-          Note
+          Note <span className="text-gray-400 font-normal">(optional)</span>
         </Label>
         <Textarea
           id="note"
@@ -259,13 +318,10 @@ const CaseHearingCreateForm = ({
           {...form.register("note")}
         />
         {form.formState.errors.note && (
-          <p className="text-xs text-red-500 mt-1">
-            {form.formState.errors.note.message}
-          </p>
+          <p className="text-xs text-red-500 mt-1">{form.formState.errors.note.message}</p>
         )}
       </div>
 
-      {/* Submit Buttons */}
       <div className="pt-2 flex flex-col space-y-3">
         <Button
           type="button"
@@ -273,14 +329,14 @@ const CaseHearingCreateForm = ({
           onClick={handleSubmitAddAnother}
           className="w-full bg-black text-white hover:bg-black/90 font-medium h-10 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Saving..." : "Save & Add Another Hearing"}
+          {isSubmitting ? "Saving..." : "Save & add another hearing"}
         </Button>
         <Button
           type="submit"
           disabled={!isActive || isSubmitting}
           className="w-full bg-primary-green hover:bg-primary-green/90 text-gray-900 font-medium h-10 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Saving..." : "Save & Complete"}
+          {isSubmitting ? "Saving..." : "Save & complete"}
         </Button>
       </div>
     </form>
@@ -288,5 +344,3 @@ const CaseHearingCreateForm = ({
 };
 
 export default CaseHearingCreateForm;
-
-

@@ -25,6 +25,7 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
   const hearings =
     Array.isArray(hearingsArr)
       ? hearingsArr.map((h: any) => ({
+          id: typeof h.id === "number" ? h.id : Number(h.id) || undefined,
           title: h.title,
           serial_no: h.serial_number,
           hearing_date: h.date,
@@ -174,7 +175,14 @@ export default function CaseDetails() {
   >(undefined);
   const [hearingDialogOpen, setHearingDialogOpen] = useState(false);
   const [selectedHearing, setSelectedHearing] = useState<
-    | { title: string; serial_no: string; date: string; note: string; file?: string }
+    | {
+        id?: number;
+        title: string;
+        serial_no: string;
+        date: string;
+        note: string;
+        file?: string;
+      }
     | undefined
   >(undefined);
   const [caseData, setCaseData] = useState<TCase | null>(null);
@@ -392,7 +400,18 @@ export default function CaseDetails() {
                     )}
                   </div>
 
-                  <div className="space-y-1 pt-3 border-t border-gray-200">
+                  <div
+                    className="flex items-center gap-3 py-3 my-1"
+                    aria-hidden
+                  >
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-sm font-bold tracking-widest text-gray-500 shrink-0">
+                      VS
+                    </span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+
+                  <div className="space-y-1">
                     <p className="text-xs font-semibold text-gray-600 uppercase">
                       Respondent
                     </p>
@@ -515,6 +534,7 @@ export default function CaseDetails() {
                 ? hearing.file.join(", ")
                 : hearing.file;
               setSelectedHearing({
+                id: hearing.id,
                 title: hearing.title,
                 serial_no: hearing.serial_no,
                 date: hearing.hearing_date,
@@ -543,6 +563,7 @@ export default function CaseDetails() {
       <HearingForm
         open={hearingDialogOpen}
         onOpenChange={setHearingDialogOpen}
+        hearingId={selectedHearing?.id}
         instance={selectedHearing}
         caseId={caseData.id}
         caseNumber={caseData.case_number}

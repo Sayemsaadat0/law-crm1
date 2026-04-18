@@ -38,6 +38,7 @@ export default function CaseTimeline({
           <p className="text-sm text-gray-500 text-center py-4">No hearings yet</p>
         ) : (
           hearings.map((hearing, index) => {
+            const rowKey = hearing.id != null ? `hearing-${hearing.id}` : `hearing-idx-${index}`;
             const dateStatus = compareDateWithToday(hearing.hearing_date);
             
             // Get background color based on date status
@@ -53,7 +54,7 @@ export default function CaseTimeline({
 
             return (
               <div
-                key={index}
+                key={rowKey}
                 className={`relative pl-6 border-l-2 border-gray-200 last:border-l-0 rounded-lg p-4 ${getBackgroundColor()}`}
               >
                 <div className="absolute -left-2 top-4 w-4 h-4 bg-primary-green rounded-full border-2 border-white"></div>

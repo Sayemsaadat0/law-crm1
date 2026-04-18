@@ -1,6 +1,7 @@
 "use client";
 
-import { User2, Calendar } from "lucide-react";
+import { Link } from "react-router-dom";
+import { User2, Calendar, Eye } from "lucide-react";
 import type { User } from "@/types/user.types";
 import { formatDisplayDate } from "@/lib/utils";
 
@@ -18,24 +19,23 @@ export default function ProfilePreview({ user }: ProfilePreviewProps) {
             <img
               src={user.image}
               alt={user.name}
-              className="w-24 h-24 rounded-full object-cover"
+              className="w-24 h-24 rounded-full object-cover ring-2 ring-gray-100"
             />
           ) : (
             <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
               <User2 className="w-12 h-12 text-gray-400" />
             </div>
           )}
-          {/* Online Badge - Fiverr Style */}
-          <div className="absolute -top-1 -right-1 w-6 h-6 bg-[#1dbf73] rounded-full border-2 border-white flex items-center justify-center">
-            <div className="w-2 h-2 bg-white rounded-full"></div>
-          </div>
         </div>
       </div>
 
       {/* Name with Edit Icon - Fiverr Style */}
       <div className="text-center space-y-2">
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex flex-col items-center gap-1">
           <h2 className="text-lg font-semibold text-gray-900">{user.name}</h2>
+          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium capitalize text-gray-700">
+            {user.role}
+          </span>
         </div>
         
         {/* Username/Email - Fiverr Style */}
@@ -44,10 +44,13 @@ export default function ProfilePreview({ user }: ProfilePreviewProps) {
         </div>
       </div>
 
-      {/* Preview Profile Button - Fiverr Style */}
-      <button className="w-full py-2.5 px-4 bg-[#d8f275] hover:bg-[#19a463] text-white text-sm font-medium rounded-md transition-colors">
-        Preview Profile
-      </button>
+      <Link
+        to="/dashboard/profile/preview"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-green px-4 py-2.5 text-sm font-semibold text-gray-900 shadow-sm transition-colors hover:bg-primary-green/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-green"
+      >
+        <Eye className="h-4 w-4 shrink-0" aria-hidden />
+        Preview profile
+      </Link>
 
       {/* User Details - Fiverr Style */}
       <div className="space-y-4 pt-4 border-t border-gray-200">

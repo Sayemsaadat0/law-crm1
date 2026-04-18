@@ -2,7 +2,6 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import RoleBasedRoute from "@/components/auth/RoleBasedRoute";
 import Courts from "@/pages/Courts";
 import CaseEdit from "@/pages/CaseEdit";
 import CaseCreateContainer from "@/components/dashboard/cases/create/CaseCreateContainer";
@@ -12,6 +11,7 @@ const Cases = lazy(() => import("../pages/Cases"));
 const CaseDetails = lazy(() => import("../pages/CaseDetails"));
 const Members = lazy(() => import("../pages/Members"));
 const Profile = lazy(() => import("../pages/Profile"));
+const ProfilePreviewPage = lazy(() => import("../pages/ProfilePreviewPage"));
 
 const router = createBrowserRouter([
   {
@@ -66,11 +66,9 @@ const router = createBrowserRouter([
       {
         path: "cases/edit/:id",
         element: (
-          <RoleBasedRoute allowedRoles={['admin', 'owner']}>
-            <Suspense fallback={<p>Loading...</p>}>
-              <CaseEdit />
-            </Suspense>
-          </RoleBasedRoute>
+          <Suspense fallback={<p>Loading...</p>}>
+            <CaseEdit />
+          </Suspense>
         ),
       },
       {
@@ -78,6 +76,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<p>Loading...</p>}>
             <Members />
+          </Suspense>
+        ),
+      },
+      {
+        path: "profile/preview",
+        element: (
+          <Suspense fallback={<p>Loading...</p>}>
+            <ProfilePreviewPage />
           </Suspense>
         ),
       },

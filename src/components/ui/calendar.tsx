@@ -5,6 +5,7 @@ import {
   ChevronRightIcon,
 } from "lucide-react";
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker";
+import "react-day-picker/style.css";
 
 import { cn, formatCalendarMonthShort, formatIsoDateInput } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -45,7 +46,7 @@ function Calendar({
         ),
         month: cn("flex flex-col w-full gap-4", defaultClassNames.month),
         nav: cn(
-          "flex items-center gap-2 w-full mb-3 px-1 justify-between",
+          "flex items-center gap-2 w-full shrink-0 mb-2 px-1 justify-between",
           defaultClassNames.nav
         ),
         button_previous: cn(
@@ -63,32 +64,39 @@ function Calendar({
           defaultClassNames.button_next
         ),
         month_caption: cn(
-          "flex items-center justify-center h-10 w-full mb-2",
+          "flex w-full flex-col items-center justify-center gap-2 min-h-10 mb-2 px-1",
           defaultClassNames.month_caption
         ),
+        // Month + year pickers sit in one row; gap matches --rdp-dropdown-gap from library CSS
         dropdowns: cn(
-          "w-full flex items-center text-sm font-semibold text-gray-900 dark:text-gray-100 justify-center h-10 gap-2",
+          "relative inline-flex w-full max-w-full flex-wrap items-center justify-center gap-2 sm:gap-3",
           defaultClassNames.dropdowns
         ),
+        // Visible “pill”: native <select> is invisible and layered on top (see `dropdown`)
         dropdown_root: cn(
-          "relative border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800",
-          "hover:border-gray-400 dark:hover:border-gray-500",
-          "focus-within:border-primary-green focus-within:ring-2 focus-within:ring-primary-green/20",
-          "rounded-lg cursor-pointer text-gray-900 dark:text-gray-100 font-semibold",
-          "px-3 py-1.5 min-w-[80px] transition-all",
+          "relative inline-flex min-h-10 shrink-0 items-stretch justify-center",
+          "min-w-[7.25rem] rounded-lg border border-gray-300 bg-white shadow-sm",
+          "text-gray-900 transition-colors",
+          "hover:border-gray-400",
+          "focus-within:border-primary-green focus-within:ring-2 focus-within:ring-primary-green/25",
+          "dark:border-gray-600 dark:bg-gray-800 dark:hover:border-gray-500",
           defaultClassNames.dropdown_root
         ),
+        // Native <select> must stay an invisible full-area overlay (see react-day-picker Dropdown)
         dropdown: cn(
-          "absolute bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-xl z-50 min-w-[120px]",
-          "text-gray-900 dark:text-gray-100 max-h-[200px] overflow-y-auto",
-          "mt-1",
+          "absolute inset-0 z-[3] m-0 h-full w-full min-w-0 cursor-pointer",
+          "appearance-none border-0 bg-transparent p-0 opacity-0",
           defaultClassNames.dropdown
         ),
         caption_label: cn(
           "select-none font-semibold text-gray-900 dark:text-gray-100",
           captionLayout === "label"
             ? "text-base"
-            : "rounded-lg pl-2 pr-1 flex items-center gap-1 text-sm h-8 [&>svg]:text-gray-600 dark:[&>svg]:text-gray-400 [&>svg]:size-4",
+            : [
+                "relative z-[1] inline-flex h-10 min-h-10 w-full items-center justify-center gap-1.5",
+                "pointer-events-none whitespace-nowrap px-3 text-sm",
+                "[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-gray-500",
+              ],
           defaultClassNames.caption_label
         ),
         table: "w-full border-collapse mt-2",

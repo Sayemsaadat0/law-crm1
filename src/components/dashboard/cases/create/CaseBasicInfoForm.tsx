@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner";
 import { parseISO } from "date-fns";
 import { usersApi, casesApi, courtsApi, type UserListItem, type Court } from "@/lib/api";
-import { cn, formatDisplayDate, formatIsoDateInput } from "@/lib/utils";
+import { cn, formatDisplayDateHyphen, formatIsoDateInput } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -226,17 +226,18 @@ const CaseBasicInfoForm = ({
                   <CalendarDays className="mr-2 h-4 w-4 shrink-0 text-blue-600" />
                   <span className="flex-1 text-left">
                     {form.watch("date")
-                      ? formatDisplayDate(form.watch("date")!)
+                      ? formatDisplayDateHyphen(form.watch("date")!)
                       : "Pick a date (optional)"}
                   </span>
                 </button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-auto p-0 bg-white border border-gray-200 shadow-xl z-50 rounded-lg"
+                className="w-auto min-w-[min(100vw-2rem,20rem)] p-0 bg-white border border-gray-200 shadow-xl z-50 rounded-lg"
                 align="start"
               >
                 <Calendar
                   mode="single"
+                  className="w-full min-w-[18rem]"
                   selected={
                     form.watch("date") && /^\d{4}-\d{2}-\d{2}$/.test(form.watch("date")!)
                       ? parseISO(form.watch("date")!)
@@ -247,8 +248,9 @@ const CaseBasicInfoForm = ({
                   }}
                   initialFocus
                   captionLayout="dropdown"
-                  fromYear={1900}
-                  toYear={new Date().getFullYear() + 10}
+                  navLayout="around"
+                  startMonth={new Date(1900, 0)}
+                  endMonth={new Date(new Date().getFullYear() + 10, 11)}
                 />
               </PopoverContent>
             </Popover>

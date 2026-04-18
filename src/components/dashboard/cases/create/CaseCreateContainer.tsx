@@ -103,7 +103,9 @@ function CaseCreateContainer() {
             <div className="rounded-xl">
               <div className="mb-6">
                 <h2 className="text-lg font-semibold text-gray-900">Client Information</h2>
-                <p className="text-sm text-gray-500 mt-1">Enter the client details and billing information</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  All fields are optional. You can add or complete client details later when editing the case.
+                </p>
               </div>
               <CaseClientForm 
                 isActive={isStepActive(2)}
@@ -116,7 +118,9 @@ function CaseCreateContainer() {
             <div className="rounded-xl">
               <div className="mb-6">
                 <h2 className="text-lg font-semibold text-gray-900">Hearing Information</h2>
-                <p className="text-sm text-gray-500 mt-1">Add hearing details for this case</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Hearing details are optional. You can add or update them later when editing the case.
+                </p>
               </div>
               <CaseHearingCreateForm 
                 isActive={isStepActive(3)}

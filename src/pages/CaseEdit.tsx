@@ -38,7 +38,6 @@ import {
   type Court,
   type UserListItem,
 } from "@/lib/api";
-import { useAuthStore } from "@/store/authStore";
 import { formatDisplayDate, formatIsoDateInput } from "@/lib/utils";
 import { CaseStageBadge } from "@/components/dashboard/cases/CaseStageBadge";
 import PaymentPanel from "@/components/pageComponent/cases/PaymentPanel";
@@ -68,6 +67,7 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
   const hearings =
     Array.isArray(hearingsArr)
       ? hearingsArr.map((h: any) => ({
+          id: typeof h.id === "number" ? h.id : Number(h.id) || undefined,
           title: h.title,
           serial_no: h.serial_number,
           hearing_date: h.date,
@@ -244,7 +244,6 @@ const toInputDate = (value?: string | null) => {
 export default function CaseEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
 
   const [caseData, setCaseData] = useState<TCase | null>(null);
   const [rawCase, setRawCase] = useState<CaseListItem | null>(null);
@@ -256,7 +255,14 @@ export default function CaseEdit() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [hearingDialogOpen, setHearingDialogOpen] = useState(false);
   const [selectedHearing, setSelectedHearing] = useState<
-    | { title: string; serial_no: string; date: string; note: string; file?: string }
+    | {
+        id?: number;
+        title: string;
+        serial_no: string;
+        date: string;
+        note: string;
+        file?: string;
+      }
     | undefined
   >(undefined);
 
@@ -266,8 +272,6 @@ export default function CaseEdit() {
   const clientForm = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
   });
-
-  const canEdit = user?.role === "admin" || user?.role === "owner";
 
   const fetchCase = useCallback(async () => {
     if (!id) return;
@@ -384,29 +388,47 @@ export default function CaseEdit() {
   };
 
   const onClientSubmit = async (values: ClientFormValues) => {
-    if (!rawCase) return;
+    if (!rawCase || !id) return;
     const raw: any = rawCase as any;
     const firstClient = (raw.caseClients ?? raw.case_clients)?.[0];
-    if (!firstClient) {
-      toast.error("No client record found for this case.");
-      return;
-    }
     try {
-      const toastId = toast.loading("Updating client details...");
-      await caseClientsApi.update(firstClient.id, {
-        client_name: values.client_name,
-        client_phone: values.client_phone || null,
-        client_address: values.client_address || null,
-        billing_bank_name: values.billing_bank_name || null,
-        referring_firm: values.referring_firm || null,
-        client_reference_number: values.client_reference_number || null,
-        client_description: values.description || null,
-        case_id: Number(id),
-      });
-      toast.success("Client details updated successfully", { id: toastId });
+      if (firstClient) {
+        const toastId = toast.loading("Updating client details...");
+        await caseClientsApi.update(firstClient.id, {
+          client_name: values.client_name,
+          client_phone: values.client_phone || null,
+          client_address: values.client_address || null,
+          billing_bank_name: values.billing_bank_name || null,
+          referring_firm: values.referring_firm || null,
+          client_reference_number: values.client_reference_number || null,
+          client_description: values.description || null,
+          case_id: Number(id),
+        });
+        toast.success("Client details updated successfully", { id: toastId });
+      } else {
+        const toastId = toast.loading("Adding client to case...");
+        const formData = new FormData();
+        formData.append("case_id", String(id));
+
+        const appendIfNonEmpty = (key: string, value: string) => {
+          const t = value.trim();
+          if (t) formData.append(key, t);
+        };
+
+        appendIfNonEmpty("client_name", values.client_name);
+        appendIfNonEmpty("client_phone", values.client_phone ?? "");
+        appendIfNonEmpty("client_address", values.client_address ?? "");
+        appendIfNonEmpty("billing_bank_name", values.billing_bank_name ?? "");
+        appendIfNonEmpty("referring_firm", values.referring_firm ?? "");
+        appendIfNonEmpty("client_reference_number", values.client_reference_number ?? "");
+        appendIfNonEmpty("client_description", values.description ?? "");
+
+        await caseClientsApi.create(formData);
+        toast.success("Client added successfully", { id: toastId });
+      }
       await fetchCase();
     } catch (err: any) {
-      toast.error(err.message || "Failed to update client details");
+      toast.error(err.message || "Failed to save client details");
     }
   };
 
@@ -417,23 +439,6 @@ export default function CaseEdit() {
   const handlePaymentCreated = () => {
     fetchCase();
   };
-
-  if (!canEdit) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Edit Case</h1>
-        <div className="bg-background rounded-lg border border-border shadow-sm p-8 flex flex-col items-center justify-center min-h-[50vh] text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Access restricted</h2>
-          <p className="text-muted-foreground mb-6 max-w-sm">
-            Only administrators and owners can edit case details.
-          </p>
-          <Button variant="outlineBtn" onClick={handleBack}>
-            Back to cases
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading || !caseData) {
     return (
@@ -876,6 +881,7 @@ export default function CaseEdit() {
               }}
               onEditHearing={(hearing) => {
                 setSelectedHearing({
+                  id: hearing.id,
                   title: hearing.title,
                   serial_no: hearing.serial_no,
                   date: hearing.hearing_date,
@@ -892,6 +898,7 @@ export default function CaseEdit() {
       <HearingForm
         open={hearingDialogOpen}
         onOpenChange={setHearingDialogOpen}
+        hearingId={selectedHearing?.id}
         instance={selectedHearing}
         caseId={caseData.id}
         caseNumber={caseData.case_number}

@@ -248,17 +248,19 @@ export default function EditProfileForm({ user, onUpdate }: EditProfileFormProps
             </button>
           </PopoverTrigger>
           <PopoverContent 
-            className="w-auto p-0 bg-white border border-gray-200 shadow-xl z-50 rounded-lg" 
+            className="w-auto min-w-[min(100vw-2rem,20rem)] p-0 bg-white border border-gray-200 shadow-xl z-50 rounded-lg" 
             align="start"
           >
             <Calendar
               mode="single"
+              className="w-full min-w-[18rem]"
               selected={form.watch("joining_date") || undefined}
               onSelect={(date) => form.setValue("joining_date", date || null)}
               initialFocus
               captionLayout="dropdown"
-              fromYear={1900}
-              toYear={new Date().getFullYear() + 10}
+              navLayout="around"
+              startMonth={new Date(1900, 0)}
+              endMonth={new Date(new Date().getFullYear() + 10, 11)}
             />
           </PopoverContent>
         </Popover>

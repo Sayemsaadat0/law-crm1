@@ -1,6 +1,8 @@
 export type TCaseStage = "Active" | "Disposed" | "Resolve" | "Archive";
 
 export type Hearing = {
+  /** Present when loaded from API; used for edit/update */
+  id?: number;
   title: string;
   serial_no: string;
   hearing_date: string; // ISO date string (yyyy-mm-dd)

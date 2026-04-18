@@ -31,6 +31,16 @@ export function formatDisplayDate(
   return format(d, "dd/MM/yyyy")
 }
 
+/** DD-MM-YYYY (hyphens) for fields that explicitly use this pattern (API storage remains yyyy-MM-dd). */
+export function formatDisplayDateHyphen(
+  dateInput: string | Date | null | undefined,
+  fallback = "—"
+): string {
+  const d = toValidDate(dateInput)
+  if (!d) return fallback
+  return format(d, "dd-MM-yyyy")
+}
+
 /** Date and time as DD/MM/YYYY HH:mm */
 export function formatDisplayDateTime(
   dateInput: string | Date | null | undefined,

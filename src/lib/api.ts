@@ -203,6 +203,53 @@ class ApiClient {
       throw new Error('Network error occurred');
     }
   }
+
+  /** PUT with multipart body (e.g. Laravel case-hearing update with files). */
+  async putMultipart<T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> {
+    const token = this.getAuthToken();
+    const url = `${this.baseURL}${endpoint}`;
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        body: formData,
+        headers,
+      });
+
+      const contentType = response.headers.get('content-type');
+      let data: ApiResponse<T>;
+
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error('Invalid JSON response from server');
+        }
+      } else {
+        const text = await response.text();
+        throw new Error(text || 'An error occurred');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      }
+
+      return data;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Network error occurred');
+    }
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);
@@ -496,6 +543,9 @@ export const caseHearingsApi = {
   // Uses multipart/form-data because of optional file upload
   create: (formData: FormData) =>
     api.postFormData<{ data: CaseHearing }>('/case-hearings', formData),
+
+  update: (id: number, formData: FormData) =>
+    api.putMultipart<{ data: CaseHearing }>(`/case-hearings/${id}`, formData),
 };
 
 // Case Payments API endpoints

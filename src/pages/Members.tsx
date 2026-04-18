@@ -48,8 +48,8 @@ function MembersContent() {
     total: 0,
   });
 
-  const isAdmin = currentUser?.role === "admin";
-  // const canManageMembers = currentUser?.role === "admin" || currentUser?.role === "owner";
+  const canManageMembers =
+    currentUser?.role === "admin" || currentUser?.role === "owner";
 
   const form = useForm<MemberFormType>({
     resolver: zodResolver(memberSchema),
@@ -193,12 +193,21 @@ function MembersContent() {
   return (
     <div className="space-y-6">
       {/* Title */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Member Management</h1>
+        {currentUser?.role === "admin" && (
+          <p className="text-sm text-gray-500">Showing all team members</p>
+        )}
+        {currentUser?.role === "owner" && (
+          <p className="text-sm text-gray-500">Showing lawyers and owners</p>
+        )}
+        {currentUser?.role === "lawyer" && (
+          <p className="text-sm text-gray-500">Showing lawyers only</p>
+        )}
       </div>
 
       <div className={`grid grid-cols-8 gap-5`}>
-        {isAdmin && (
+        {canManageMembers && (
           <div className="col-span-2 bg-white p-6 shadow-sm rounded-xl border border-gray-200">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-gray-900">Add New Member</h2>
@@ -342,7 +351,13 @@ function MembersContent() {
         )}
 
         {/* Member Table */}
-        <div className={isAdmin ? "col-span-6" : "col-span-8"}>
+        <div className={canManageMembers ? "col-span-6" : "col-span-8"}>
+          {!canManageMembers && (
+            <div className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
+              View-only access: you see other lawyers in the directory. Adding or removing members is
+              limited to admins and owners.
+            </div>
+          )}
           {/* Search */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mb-4">
             <div className="relative">
@@ -375,7 +390,7 @@ function MembersContent() {
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-black">
                         Role
                       </th>
-                      {isAdmin && (
+                      {canManageMembers && (
                         <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-black">
                           Actions
                         </th>
@@ -386,7 +401,7 @@ function MembersContent() {
                     {members.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={isAdmin ? 4 : 3}
+                          colSpan={canManageMembers ? 4 : 3}
                           className="px-3 py-8 text-center text-sm text-muted-foreground"
                         >
                           No members found
@@ -429,10 +444,11 @@ function MembersContent() {
                               {getRoleDisplayName(member.role)}
                             </span>
                           </td>
-                          {isAdmin && (
+                          {canManageMembers && (
                             <td className="px-3 py-2.5">
                               <div className="flex items-center justify-end">
                                 <button
+                                  type="button"
                                   onClick={() => handleDelete(member)}
                                   disabled={currentUser?.id === member.id}
                                   className="p-1.5 rounded-md hover:bg-red-50 text-red-600 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

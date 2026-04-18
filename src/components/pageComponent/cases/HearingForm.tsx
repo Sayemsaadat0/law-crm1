@@ -40,6 +40,8 @@ interface HearingInstance {
 interface HearingFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When set, submit updates this hearing instead of creating a new one */
+  hearingId?: number;
   instance?: HearingInstance;
   caseId?: string;
   caseNumber?: string;
@@ -50,6 +52,7 @@ interface HearingFormProps {
 const HearingForm = ({
   open,
   onOpenChange,
+  hearingId,
   instance,
   caseId,
   caseNumber,
@@ -103,7 +106,8 @@ const HearingForm = ({
       }
 
       setIsSubmitting(true);
-      toastId = toast.loading("Saving hearing...");
+      const isUpdate = hearingId != null && hearingId > 0;
+      toastId = toast.loading(isUpdate ? "Updating hearing..." : "Saving hearing...");
 
       const formData = new FormData();
       formData.append("title", data.title);
@@ -121,12 +125,19 @@ const HearingForm = ({
         });
       }
 
-      await caseHearingsApi.create(formData);
+      if (isUpdate) {
+        await caseHearingsApi.update(hearingId, formData);
+      } else {
+        await caseHearingsApi.create(formData);
+      }
 
       if (toastId !== undefined) {
-        toast.success("Hearing created successfully!", { id: toastId });
+        toast.success(
+          isUpdate ? "Hearing updated successfully!" : "Hearing created successfully!",
+          { id: toastId }
+        );
       } else {
-        toast.success("Hearing created successfully!");
+        toast.success(isUpdate ? "Hearing updated successfully!" : "Hearing created successfully!");
       }
 
       form.reset();
@@ -164,7 +175,7 @@ const HearingForm = ({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {instance ? "Edit Hearing" : "New Hearing"}
+            {hearingId ? "Edit Hearing" : "New Hearing"}
           </DialogTitle>
           {(caseNumber || fileNumber) && (
             <div className="text-sm text-gray-500 mt-1">
@@ -288,7 +299,7 @@ const HearingForm = ({
               disabled={isSubmitting}
               className="bg-primary-green hover:bg-primary-green/90 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Saving..." : instance ? "Update" : "Create"}
+              {isSubmitting ? "Saving..." : hearingId ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

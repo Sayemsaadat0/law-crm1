@@ -11,19 +11,41 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { caseClientsApi } from "@/lib/api";
 
+/** All fields optional; client can be added or completed later from case edit. */
 const caseClientSchema = z.object({
-  client_name: z.string().min(1, "Client name is required"),
-  client_address: z.string().min(1, "Client address is required"),
-  client_phone: z.string().min(1, "Client phone is required"),
-  billing_bank_name: z.string().min(1, "Billing bank name is required"),
-  referring_firm: z.string().min(1, "Referring firm is required"),
-  client_reference_number: z.string().min(1, "Client reference number is required"),
-  client_description: z.string().min(1, "Client description is required"),
-  // Fee schedule files are optional and handled manually
+  client_name: z.string().max(255),
+  client_address: z.string(),
+  client_phone: z.string().max(20),
+  billing_bank_name: z.string().max(255),
+  referring_firm: z.string().max(255),
+  client_reference_number: z.string().max(255),
+  client_description: z.string(),
   fee_schedule_files: z.any().optional(),
 });
 
 type CaseClientFormType = z.infer<typeof caseClientSchema>;
+
+function hasFeeFiles(data: CaseClientFormType): boolean {
+  if (!data.fee_schedule_files) return false;
+  const files = Array.isArray(data.fee_schedule_files)
+    ? data.fee_schedule_files
+    : [data.fee_schedule_files];
+  return files.some((f: File) => f instanceof File && f.size > 0);
+}
+
+function hasAnyClientInput(data: CaseClientFormType): boolean {
+  const text = [
+    data.client_name,
+    data.client_address,
+    data.client_phone,
+    data.billing_bank_name,
+    data.referring_firm,
+    data.client_reference_number,
+    data.client_description,
+  ];
+  if (text.some((s) => String(s ?? "").trim() !== "")) return true;
+  return hasFeeFiles(data);
+}
 
 interface CaseClientFormProps {
   instance?: CaseClientFormType;
@@ -71,25 +93,40 @@ const CaseClientForm = ({
         return;
       }
 
+      if (!hasAnyClientInput(data)) {
+        toast.success(
+          "Continuing without client details. You can add them later when editing the case."
+        );
+        setFeeFilesPreview(null);
+        if (onStepComplete) onStepComplete();
+        return;
+      }
+
       setIsSubmitting(true);
       toastId = toast.loading("Saving client information...");
 
       const formData = new FormData();
-      formData.append("client_name", data.client_name);
-      formData.append("client_phone", data.client_phone);
-      formData.append("client_address", data.client_address);
-      formData.append("billing_bank_name", data.billing_bank_name);
-      formData.append("referring_firm", data.referring_firm);
-      formData.append("client_reference_number", data.client_reference_number);
-      formData.append("client_description", data.client_description);
       formData.append("case_id", caseId);
+
+      const appendIfNonEmpty = (key: string, value: string) => {
+        const t = value.trim();
+        if (t) formData.append(key, t);
+      };
+
+      appendIfNonEmpty("client_name", data.client_name);
+      appendIfNonEmpty("client_phone", data.client_phone);
+      appendIfNonEmpty("client_address", data.client_address);
+      appendIfNonEmpty("billing_bank_name", data.billing_bank_name);
+      appendIfNonEmpty("referring_firm", data.referring_firm);
+      appendIfNonEmpty("client_reference_number", data.client_reference_number);
+      appendIfNonEmpty("client_description", data.client_description);
 
       if (data.fee_schedule_files) {
         const files = Array.isArray(data.fee_schedule_files)
           ? data.fee_schedule_files
           : [data.fee_schedule_files];
         files.forEach((file: File) => {
-          if (file) {
+          if (file && file.size > 0) {
             formData.append("fee_schedule_files[]", file);
           }
         });
@@ -138,7 +175,7 @@ const CaseClientForm = ({
         {/* Client Name */}
         <div className="flex flex-col flex-1 space-y-2">
           <Label htmlFor="client_name" className="text-sm font-medium text-gray-700">
-            Client Name
+            Client Name <span className="text-gray-400 font-normal">(optional)</span>
           </Label>
           <Input
             id="client_name"
@@ -155,7 +192,7 @@ const CaseClientForm = ({
         {/* Referring Firm */}
         <div className="flex flex-col flex-1 space-y-2">
           <Label htmlFor="referring_firm" className="text-sm font-medium text-gray-700">
-            Referring Firm
+            Referring Firm <span className="text-gray-400 font-normal">(optional)</span>
           </Label>
           <Input
             id="referring_firm"
@@ -175,7 +212,7 @@ const CaseClientForm = ({
       <div className="flex flex-row items-center space-x-6">
         <div className="flex flex-col flex-1 space-y-2">
           <Label htmlFor="client_phone" className="text-sm font-medium text-gray-700">
-            Client Phone
+            Client Phone <span className="text-gray-400 font-normal">(optional)</span>
           </Label>
           <Input
             id="client_phone"
@@ -211,7 +248,7 @@ const CaseClientForm = ({
       {/* Billing Bank Name */}
       <div className="flex flex-col space-y-2">
         <Label htmlFor="billing_bank_name" className="text-sm font-medium text-gray-700">
-          Billing Bank Name
+          Billing Bank Name <span className="text-gray-400 font-normal">(optional)</span>
         </Label>
         <Input
           id="billing_bank_name"
@@ -229,7 +266,7 @@ const CaseClientForm = ({
       {/* Client Reference Number */}
       <div className="space-y-2">
         <Label htmlFor="client_reference_number" className="text-sm font-medium text-gray-700">
-          Client Reference Number
+          Client Reference Number <span className="text-gray-400 font-normal">(optional)</span>
         </Label>
         <Input
           id="client_reference_number"
@@ -247,7 +284,7 @@ const CaseClientForm = ({
       {/* Client Description */}
       <div className="space-y-2">
         <Label htmlFor="client_description" className="text-sm font-medium text-gray-700">
-          Client Description
+          Client Description <span className="text-gray-400 font-normal">(optional)</span>
         </Label>
         <Textarea
           id="client_description"
@@ -265,7 +302,7 @@ const CaseClientForm = ({
       {/* Fee Schedule (Bills) */}
       <div className="space-y-2">
         <Label htmlFor="fee_schedule_files" className="text-sm font-medium text-gray-700">
-          Fee Schedule (Bills)
+          Fee Schedule (Bills) <span className="text-gray-400 font-normal">(optional)</span>
         </Label>
         <div className="relative">
           <Input
@@ -289,7 +326,7 @@ const CaseClientForm = ({
           disabled={!isActive || isSubmitting}
           className="w-full bg-primary-green hover:bg-primary-green/90 text-gray-900 font-medium h-10 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Saving..." : "Save & Continue"}
+          {isSubmitting ? "Saving..." : "Save & continue"}
         </Button>
       </div>
     </form>
