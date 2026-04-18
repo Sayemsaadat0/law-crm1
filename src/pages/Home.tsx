@@ -359,12 +359,15 @@ const Home = () => {
       {/* Welcome Section */}
       <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl sm:text-2xl font-bold">Welcome back 👋</h1>
-        <Link to="/dashboard/cases">
+        <Link
+          to="/dashboard/cases/create"
+          className="inline-flex justify-end sm:justify-start shrink-0 max-w-full"
+        >
           <Button
             type="button"
-            className="h-9 px-4 text-sm bg-primary-green text-black hover:bg-primary-green/90 gap-2"
+            className="inline-flex h-9 min-h-9 max-w-full items-center justify-center gap-2 px-3 sm:px-4 py-0 text-sm leading-none bg-primary-green text-black hover:bg-primary-green/90 whitespace-nowrap md:py-0 [&_svg]:shrink-0"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="size-4" aria-hidden />
             Add Case
           </Button>
         </Link>

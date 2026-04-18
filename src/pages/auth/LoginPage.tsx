@@ -74,7 +74,7 @@ export default function LoginPage() {
               <Scale className="w-6 h-6 text-gray-900" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">LegalCase</h1>
+              <h1 className="text-xl font-bold text-gray-900">H &amp; H Company Court Diary</h1>
               <p className="text-xs text-gray-500">Case Management</p>
             </div>
           </div>
