@@ -368,7 +368,7 @@ export default function CaseEdit() {
       const toastId = toast.loading("Updating case details...");
       await casesApi.update(Number(id), {
         date: values.date || null,
-        number_of_file: Number(values.number_of_file),
+        number_of_file: values.number_of_file,
         number_of_case: values.number_of_case,
         status: values.status || null,
         stages: values.stage || null,

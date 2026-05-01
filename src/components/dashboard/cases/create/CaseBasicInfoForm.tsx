@@ -138,7 +138,7 @@ const CaseBasicInfoForm = ({
 
       // Prepare payload for API (convert to backend field names/types)
       const payload: any = {
-        number_of_file: Number(data.number_of_file),
+        number_of_file: data.number_of_file,
         number_of_case: Number(data.number_of_case),
       };
 

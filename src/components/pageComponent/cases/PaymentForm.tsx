@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { parseISO } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +24,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { Hearing } from "@/types/case.type";
-import { formatDisplayDate } from "@/lib/utils";
+import { cn, formatDisplayDate, formatDisplayDateHyphen, formatIsoDateInput } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarDays } from "lucide-react";
 import { casePaymentsApi } from "@/lib/api";
 
 const paymentSchema = z.object({
@@ -160,15 +164,56 @@ const PaymentForm = ({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
           {/* Date */}
           <div className="space-y-2">
-            <Label htmlFor="payment-date" className="text-sm font-medium text-gray-700">
+            <Label htmlFor="payment-date-picker" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-blue-600" />
               Date
             </Label>
-            <Input
-              id="payment-date"
-              type="date"
-              className="w-full h-10"
-              {...form.register("date")}
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  id="payment-date-picker"
+                  disabled={isSubmitting}
+                  className={cn(
+                    "w-full h-10 px-3 text-sm rounded-md border border-gray-300 bg-white",
+                    "flex items-center justify-start text-left font-normal",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500",
+                    "disabled:pointer-events-none disabled:opacity-50",
+                    "hover:bg-gray-50/80 transition-colors",
+                    form.watch("date") ? "text-gray-900" : "text-gray-500"
+                  )}
+                >
+                  <CalendarDays className="mr-2 h-4 w-4 shrink-0 text-blue-600" />
+                  <span className="flex-1 text-left">
+                    {form.watch("date")
+                      ? formatDisplayDateHyphen(form.watch("date")!)
+                      : "Pick a date"}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto min-w-[min(100vw-2rem,20rem)] p-0 bg-white border border-gray-200 shadow-xl z-50 rounded-lg"
+                align="start"
+              >
+                <Calendar
+                  mode="single"
+                  className="w-full min-w-[18rem]"
+                  selected={
+                    form.watch("date") && /^\d{4}-\d{2}-\d{2}$/.test(form.watch("date")!)
+                      ? parseISO(form.watch("date")!)
+                      : undefined
+                  }
+                  onSelect={(d) => {
+                    form.setValue("date", d ? formatIsoDateInput(d) : "");
+                  }}
+                  initialFocus
+                  captionLayout="dropdown"
+                  navLayout="around"
+                  startMonth={new Date(1900, 0)}
+                  endMonth={new Date(new Date().getFullYear() + 10, 11)}
+                />
+              </PopoverContent>
+            </Popover>
             {form.formState.errors.date && (
               <p className="text-xs text-red-500 mt-1">
                 {form.formState.errors.date.message}

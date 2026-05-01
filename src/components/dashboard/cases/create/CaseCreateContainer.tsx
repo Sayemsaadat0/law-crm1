@@ -60,7 +60,7 @@ function CaseCreateContainer() {
 
   return (
     <div>
-      <div className="w-full flex flex-col items-center">
+      <div className="w-full flex flex-col items-center pb-24">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full max-w-full lg:max-w-[1000px] xl:max-w-[1200px] 2xl:max-w-[1400px]">
           <TabsList className="w-full min-w-[500px] max-w-full lg:max-w-[1000px] xl:max-w-[1200px] 2xl:max-w-[1400px] h-11 bg-white rounded-xl shadow-sm border border-gray-200 p-1 gap-1 mb-6 inline-flex">
             <TabsTrigger 

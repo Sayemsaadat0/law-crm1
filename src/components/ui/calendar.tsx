@@ -28,7 +28,7 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        "bg-white dark:bg-gray-800 group/calendar p-4 rounded-lg [--cell-size:2.5rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
+        "bg-white dark:bg-gray-800 group/calendar p-3 rounded-lg [--cell-size:2.15rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
         String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className
@@ -46,25 +46,25 @@ function Calendar({
         ),
         month: cn("flex flex-col w-full gap-4", defaultClassNames.month),
         nav: cn(
-          "flex items-center gap-2 w-full shrink-0 mb-2 px-1 justify-between",
+          "flex items-center gap-1.5 w-full shrink-0 mb-1.5 px-0.5 justify-between",
           defaultClassNames.nav
         ),
         button_previous: cn(
           buttonVariants({ variant: buttonVariant }),
-          "h-8 w-8 aria-disabled:opacity-50 p-0 select-none rounded-md",
+          "h-7 w-7 aria-disabled:opacity-50 p-0 select-none rounded-md",
           "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100",
           "border border-gray-200 dark:border-gray-700",
           defaultClassNames.button_previous
         ),
         button_next: cn(
           buttonVariants({ variant: buttonVariant }),
-          "h-8 w-8 aria-disabled:opacity-50 p-0 select-none rounded-md",
+          "h-7 w-7 aria-disabled:opacity-50 p-0 select-none rounded-md",
           "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100",
           "border border-gray-200 dark:border-gray-700",
           defaultClassNames.button_next
         ),
         month_caption: cn(
-          "flex w-full flex-col items-center justify-center gap-2 min-h-10 mb-2 px-1",
+          "flex w-full flex-col items-center justify-center gap-1.5 min-h-8 mb-1.5 px-0.5",
           defaultClassNames.month_caption
         ),
         // Month + year pickers sit in one row; gap matches --rdp-dropdown-gap from library CSS
@@ -74,7 +74,7 @@ function Calendar({
         ),
         // Visible “pill”: native <select> is invisible and layered on top (see `dropdown`)
         dropdown_root: cn(
-          "relative inline-flex min-h-10 shrink-0 items-stretch justify-center",
+          "relative inline-flex min-h-8 shrink-0 items-stretch justify-center",
           "min-w-[7.25rem] rounded-lg border border-gray-300 bg-white shadow-sm",
           "text-gray-900 transition-colors",
           "hover:border-gray-400",
@@ -93,16 +93,16 @@ function Calendar({
           captionLayout === "label"
             ? "text-base"
             : [
-                "relative z-[1] inline-flex h-10 min-h-10 w-full items-center justify-center gap-1.5",
-                "pointer-events-none whitespace-nowrap px-3 text-sm",
-                "[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-gray-500",
+                "relative z-[1] inline-flex h-8 min-h-8 w-full items-center justify-center gap-1.5",
+                "pointer-events-none whitespace-nowrap px-2.5 text-xs",
+                "[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-gray-500",
               ],
           defaultClassNames.caption_label
         ),
-        table: "w-full border-collapse mt-2",
-        weekdays: cn("flex mb-1", defaultClassNames.weekdays),
+        table: "w-full border-collapse mt-1.5",
+        weekdays: cn("flex mb-0.5", defaultClassNames.weekdays),
         weekday: cn(
-          "text-gray-600 dark:text-gray-400 rounded-md flex-1 font-semibold text-xs select-none py-2",
+          "text-gray-600 dark:text-gray-400 rounded-md flex-1 font-semibold text-[11px] select-none py-1.5",
           defaultClassNames.weekday
         ),
         week: cn("flex w-full gap-1", defaultClassNames.week),
@@ -226,9 +226,9 @@ function CalendarDayButton({
         "text-gray-900 dark:text-gray-100 font-medium",
         "group-data-[focused=true]/day:border-2 group-data-[focused=true]/day:border-primary-green group-data-[focused=true]/day:ring-2 group-data-[focused=true]/day:ring-primary-green/20",
         "hover:bg-gray-100 dark:hover:bg-gray-700 hover:rounded-md transition-colors",
-        "flex aspect-square size-auto w-full h-10 flex items-center justify-center leading-none rounded-md",
+        "aspect-square size-auto w-full h-8 flex items-center justify-center leading-none rounded-md",
         "group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10",
-        "[&>span]:text-sm [&>span]:font-medium",
+        "[&>span]:text-xs [&>span]:font-medium",
         defaultClassNames.day,
         className
       )}

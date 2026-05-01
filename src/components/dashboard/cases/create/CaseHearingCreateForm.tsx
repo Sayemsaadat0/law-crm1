@@ -5,10 +5,15 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { parseISO } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { cn, formatDisplayDateHyphen, formatIsoDateInput } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import { caseHearingsApi, casesApi } from "@/lib/api";
 
@@ -298,10 +303,56 @@ const CaseHearingCreateForm = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="date" className="text-sm font-medium text-gray-700">
+        <Label htmlFor="hearing-date-picker" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <CalendarDays className="w-4 h-4 text-blue-600" />
           Hearing Date <span className="text-gray-400 font-normal">(if saving a hearing)</span>
         </Label>
-        <Input id="date" type="date" className="w-full h-10" {...form.register("date")} />
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              id="hearing-date-picker"
+              disabled={!isActive || isSubmitting}
+              className={cn(
+                "w-full h-10 px-3 text-sm rounded-md border border-gray-300 bg-white",
+                "flex items-center justify-start text-left font-normal",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500",
+                "disabled:pointer-events-none disabled:opacity-50",
+                "hover:bg-gray-50/80 transition-colors",
+                form.watch("date") ? "text-gray-900" : "text-gray-500"
+              )}
+            >
+              <CalendarDays className="mr-2 h-4 w-4 shrink-0 text-blue-600" />
+              <span className="flex-1 text-left">
+                {form.watch("date")
+                  ? formatDisplayDateHyphen(form.watch("date")!)
+                  : "Pick a date"}
+              </span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-auto min-w-[min(100vw-2rem,20rem)] p-0 bg-white border border-gray-200 shadow-xl z-50 rounded-lg"
+            align="start"
+          >
+            <Calendar
+              mode="single"
+              className="w-full min-w-[18rem]"
+              selected={
+                form.watch("date") && /^\d{4}-\d{2}-\d{2}$/.test(form.watch("date")!)
+                  ? parseISO(form.watch("date")!)
+                  : undefined
+              }
+              onSelect={(d) => {
+                form.setValue("date", d ? formatIsoDateInput(d) : "");
+              }}
+              initialFocus
+              captionLayout="dropdown"
+              navLayout="around"
+              startMonth={new Date(1900, 0)}
+              endMonth={new Date(new Date().getFullYear() + 10, 11)}
+            />
+          </PopoverContent>
+        </Popover>
         {form.formState.errors.date && (
           <p className="text-xs text-red-500 mt-1">{form.formState.errors.date.message}</p>
         )}
