@@ -19,6 +19,10 @@ export type UploadProgressPayload = {
   percent: number;
 };
 
+/** Nginx / PHP reject the body before Laravel runs (common on large or slow uploads). */
+const HTTP_413_BODY_LIMIT_MESSAGE =
+  "Upload rejected (HTTP 413): the server’s request size limit is too small. On the API host, raise nginx client_max_body_size (e.g. 512m) and PHP post_max_size / upload_max_filesize — see law-farm-backend deploy/nginx-backend-uploads.conf and public/.user.ini.";
+
 class ApiClient {
   private baseURL: string;
 
@@ -52,6 +56,11 @@ class ApiClient {
         ...options,
         headers,
       });
+
+      if (response.status === 413) {
+        await response.text().catch(() => undefined);
+        throw new Error(HTTP_413_BODY_LIMIT_MESSAGE);
+      }
 
       // Check if response has content before parsing JSON
       const contentType = response.headers.get('content-type');
@@ -135,6 +144,11 @@ class ApiClient {
         body: formData,
       });
 
+      if (response.status === 413) {
+        await response.text().catch(() => undefined);
+        throw new Error(HTTP_413_BODY_LIMIT_MESSAGE);
+      }
+
       // Check if response has content before parsing JSON
       const contentType = response.headers.get('content-type');
       let data: ApiResponse<T>;
@@ -182,6 +196,11 @@ class ApiClient {
         headers,
         body: formData,
       });
+
+      if (response.status === 413) {
+        await response.text().catch(() => undefined);
+        throw new Error(HTTP_413_BODY_LIMIT_MESSAGE);
+      }
 
       // Check if response has content before parsing JSON
       const contentType = response.headers.get('content-type');
@@ -262,6 +281,11 @@ class ApiClient {
       };
 
       xhr.onload = () => {
+        if (xhr.status === 413) {
+          reject(new Error(HTTP_413_BODY_LIMIT_MESSAGE));
+          return;
+        }
+
         const contentType = xhr.getResponseHeader("content-type");
         let data: ApiResponse<T>;
 
@@ -312,6 +336,11 @@ class ApiClient {
         body: formData,
         headers,
       });
+
+      if (response.status === 413) {
+        await response.text().catch(() => undefined);
+        throw new Error(HTTP_413_BODY_LIMIT_MESSAGE);
+      }
 
       const contentType = response.headers.get('content-type');
       let data: ApiResponse<T>;
