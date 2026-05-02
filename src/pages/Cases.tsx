@@ -59,7 +59,7 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): CaseListRow => {
   return {
     id: String(apiCase.id),
     case_number: apiCase.number_of_case,
-    file_number: apiCase.file_number || String((raw.number_of_file ?? "")),
+    file_number: apiCase.file_number ?? apiCase.number_of_file ?? "",
     case_stage: "Active",
     raw_stage: (apiCase.stages || "").toString(),
     raw_status: (raw.status || "").toString(),

@@ -68,7 +68,7 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
   return {
     id: String(apiCase.id),
     case_number: apiCase.number_of_case,
-    file_number: apiCase.file_number || "",
+    file_number: apiCase.file_number ?? apiCase.number_of_file ?? "",
     case_stage: statusMap[(apiCase as any).status?.toLowerCase() || "active"] || "Active",
     case_description: apiCase.description || "",
     case_date: apiCase.date || "",

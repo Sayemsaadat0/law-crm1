@@ -9,6 +9,10 @@ import PaymentPanel from "@/components/pageComponent/cases/PaymentPanel";
 import CaseTimeline from "@/components/pageComponent/cases/CaseTimeline";
 import PaymentForm from "@/components/pageComponent/cases/PaymentForm";
 import HearingForm from "@/components/pageComponent/cases/HearingForm";
+import {
+  normalizeHearingAttachments,
+  type NormalizedHearingAttachment,
+} from "@/lib/hearing-files";
 import type { TCase, TCaseStage, Hearing } from "@/types/case.type";
 import { casesApi, type CaseListItem } from "@/lib/api";
 import { formatDisplayDate, formatPartyRelationLabel } from "@/lib/utils";
@@ -54,7 +58,7 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
   return {
     id: String(apiCase.id),
     case_number: apiCase.number_of_case,
-    file_number: apiCase.file_number || "",
+    file_number: apiCase.file_number ?? apiCase.number_of_file ?? "",
     case_stage: stageMap[apiCase.stages?.toLowerCase() || "active"] || "Active",
     case_description: apiCase.description || "",
     case_date: apiCase.date || "",
@@ -181,7 +185,7 @@ export default function CaseDetails() {
         serial_no: string;
         date: string;
         note: string;
-        file?: string;
+        existingAttachments?: NormalizedHearingAttachment[];
       }
     | undefined
   >(undefined);
@@ -530,16 +534,13 @@ export default function CaseDetails() {
               setHearingDialogOpen(true);
             }}
             onEditHearing={(hearing: Hearing) => {
-              const fileDisplay = Array.isArray(hearing.file)
-                ? hearing.file.join(", ")
-                : hearing.file;
               setSelectedHearing({
                 id: hearing.id,
                 title: hearing.title,
                 serial_no: hearing.serial_no,
                 date: hearing.hearing_date,
                 note: hearing.details,
-                file: fileDisplay,
+                existingAttachments: normalizeHearingAttachments(hearing.file),
               });
               setHearingDialogOpen(true);
             }}

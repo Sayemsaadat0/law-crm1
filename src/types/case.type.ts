@@ -7,8 +7,10 @@ export type Hearing = {
   serial_no: string;
   hearing_date: string; // ISO date string (yyyy-mm-dd)
   details: string;
-  // Can be a single URL (string) or an array of URLs (for multiple files)
-  file?: string | string[];
+  /**
+   * Raw from API: JSON string (array of URLs or { url, original_name, mime }), or legacy string / string[].
+   */
+  file?: string | string[] | Array<{ url: string; original_name?: string; mime?: string }>;
 };
 
 export type Payment = {

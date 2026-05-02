@@ -17,7 +17,14 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { parseISO } from "date-fns";
-import { usersApi, casesApi, courtsApi, type UserListItem, type Court } from "@/lib/api";
+import {
+  usersApi,
+  casesApi,
+  courtsApi,
+  type CaseCreatePayload,
+  type UserListItem,
+  type Court,
+} from "@/lib/api";
 import { cn, formatDisplayDateHyphen, formatIsoDateInput } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -33,8 +40,8 @@ import {
 } from "lucide-react";
 
 const caseBasicInfoSchema = z.object({
-  number_of_file: z.string().min(1, "Number of file is required"),
-  number_of_case: z.string().min(1, "Number of case is required"),
+  number_of_file: z.string().min(1, "File number is required").max(255, "Max 255 characters"),
+  number_of_case: z.string().min(1, "Case number is required").max(255, "Max 255 characters"),
   date: z.string().optional(),
   court_id: z.string().optional(),
   status: z.enum(["active", "disposed", "resolve", "archive"]).optional(),
@@ -136,10 +143,9 @@ const CaseBasicInfoForm = ({
       // Basic info should only submit when step is active
       if (!isActive) return;
 
-      // Prepare payload for API (convert to backend field names/types)
-      const payload: any = {
-        number_of_file: data.number_of_file,
-        number_of_case: Number(data.number_of_case),
+      const payload: CaseCreatePayload = {
+        number_of_file: data.number_of_file.trim(),
+        number_of_case: data.number_of_case.trim(),
       };
 
       // Only include optional fields if they have values
@@ -310,10 +316,14 @@ const CaseBasicInfoForm = ({
             </Label>
             <Input
               id="number_of_file"
-              placeholder="Enter file number"
+              placeholder="e.g. FILE-2025-001 or 12345"
+              autoComplete="off"
               className="w-full h-11 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               {...form.register("number_of_file")}
             />
+            <p className="text-xs text-muted-foreground">
+              Text or digits, up to 255 characters (stored as file number).
+            </p>
             {form.formState.errors.number_of_file && (
               <p className="text-xs text-red-500 mt-1">
                 {form.formState.errors.number_of_file.message}
@@ -329,10 +339,14 @@ const CaseBasicInfoForm = ({
             </Label>
             <Input
               id="number_of_case"
-              placeholder="Enter case number"
+              placeholder="e.g. CIV-2025-42 or 100"
+              autoComplete="off"
               className="w-full h-11 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               {...form.register("number_of_case")}
             />
+            <p className="text-xs text-muted-foreground">
+              Text or digits, up to 255 characters (stored as case number).
+            </p>
             {form.formState.errors.number_of_case && (
               <p className="text-xs text-red-500 mt-1">
                 {form.formState.errors.number_of_case.message}

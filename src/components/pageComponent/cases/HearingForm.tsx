@@ -19,9 +19,33 @@ import { Button } from "@/components/ui/button";
 import { cn, formatDisplayDateHyphen, formatIsoDateInput } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays } from "lucide-react";
+import {
+  CalendarDays,
+  FileArchive,
+  FileText,
+  Image as ImageIcon,
+  Paperclip,
+  Video,
+} from "lucide-react";
 import { toast } from "sonner";
-import { caseHearingsApi } from "@/lib/api";
+import { caseHearingsApi, waitForCaseHearingAttachmentsReady } from "@/lib/api";
+import type { NormalizedHearingAttachment } from "@/lib/hearing-files";
+
+function AttachmentKindIcon({ kind }: { kind: NormalizedHearingAttachment["kind"] }) {
+  switch (kind) {
+    case "image":
+      return <ImageIcon className="w-3.5 h-3.5 shrink-0" aria-hidden />;
+    case "video":
+      return <Video className="w-3.5 h-3.5 shrink-0" aria-hidden />;
+    case "pdf":
+    case "document":
+      return <FileText className="w-3.5 h-3.5 shrink-0" aria-hidden />;
+    case "archive":
+      return <FileArchive className="w-3.5 h-3.5 shrink-0" aria-hidden />;
+    default:
+      return <Paperclip className="w-3.5 h-3.5 shrink-0" aria-hidden />;
+  }
+}
 
 const hearingSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -39,7 +63,8 @@ interface HearingInstance {
   serial_no: string;
   date: string;
   note: string;
-  file?: string;
+  /** Current attachments when editing (not re-posted unless user selects new files). */
+  existingAttachments?: NormalizedHearingAttachment[];
 }
 
 interface HearingFormProps {
@@ -66,6 +91,10 @@ const HearingForm = ({
 }: HearingFormProps) => {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** idle | upload = bytes to server | finalize = queue job finishing */
+  const [submitPhase, setSubmitPhase] = useState<"idle" | "upload" | "finalize">("idle");
+  /** 0–100 while uploading; -1 when browser does not report total */
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
 
   const form = useForm<HearingFormData>({
     resolver: zodResolver(hearingSchema),
@@ -99,6 +128,8 @@ const HearingForm = ({
       });
       setFilePreview(null);
     }
+    setSubmitPhase("idle");
+    setUploadPercent(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance, open]);
 
@@ -111,8 +142,10 @@ const HearingForm = ({
       }
 
       setIsSubmitting(true);
+      setSubmitPhase("upload");
+      setUploadPercent(0);
       const isUpdate = hearingId != null && hearingId > 0;
-      toastId = toast.loading(isUpdate ? "Updating hearing..." : "Saving hearing...");
+      toastId = toast.loading(isUpdate ? "Updating hearing…" : "Saving hearing…");
 
       const formData = new FormData();
       formData.append("title", data.title);
@@ -130,11 +163,41 @@ const HearingForm = ({
         });
       }
 
-      if (isUpdate) {
-        await caseHearingsApi.update(hearingId, formData);
-      } else {
-        await caseHearingsApi.create(formData);
+      let lastToastAt = 0;
+      const onUploadProgress = (p: { percent: number }) => {
+        if (p.percent >= 0) {
+          setUploadPercent(p.percent);
+          const now = Date.now();
+          if (now - lastToastAt > 200 && toastId !== undefined) {
+            lastToastAt = now;
+            toast.loading(`Uploading… ${p.percent}%`, { id: toastId });
+          }
+        } else {
+          setUploadPercent(-1);
+          if (toastId !== undefined) {
+            toast.loading("Uploading…", { id: toastId });
+          }
+        }
+      };
+
+      const res = isUpdate
+        ? await caseHearingsApi.updateWithProgress(hearingId, formData, onUploadProgress)
+        : await caseHearingsApi.createWithProgress(formData, onUploadProgress);
+      const hearing = res.data;
+      if (hearing?.id && hearing.attachments_status === "pending") {
+        setSubmitPhase("finalize");
+        setUploadPercent(null);
+        if (toastId !== undefined) {
+          toast.loading("Processing files on server…", { id: toastId });
+        }
+        await waitForCaseHearingAttachmentsReady(hearing.id, ({ attempt }) => {
+          if (toastId !== undefined) {
+            toast.loading(`Processing files on server… (${attempt})`, { id: toastId });
+          }
+        });
       }
+      setSubmitPhase("idle");
+      setUploadPercent(null);
 
       if (toastId !== undefined) {
         toast.success(
@@ -160,6 +223,8 @@ const HearingForm = ({
         toast.error(errorMessage);
       }
     } finally {
+      setSubmitPhase("idle");
+      setUploadPercent(null);
       setIsSubmitting(false);
     }
   };
@@ -296,16 +361,42 @@ const HearingForm = ({
                 id="hearing-file"
                 type="file"
                 multiple
-                accept=".pdf,.jpg,.jpeg,.png"
                 className="w-full h-10 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-green file:text-gray-900 hover:file:bg-primary-green/90"
                 onChange={handleFileChange}
               />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Each file (including video): max 100 MB. Larger uploads are rejected by the server.
+              </p>
               {filePreview && (
-                <p className="text-xs text-gray-500 mt-1">{filePreview}</p>
+                <p className="text-xs text-gray-500 mt-1">New: {filePreview}</p>
               )}
-              {instance?.file && !filePreview && (
-                <p className="text-xs text-gray-500 mt-1">Current file: {instance.file}</p>
-              )}
+              {hearingId != null &&
+                hearingId > 0 &&
+                (instance?.existingAttachments?.length ?? 0) > 0 &&
+                !filePreview && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs font-medium text-gray-600">Current attachments</p>
+                    <ul className="text-xs space-y-1">
+                      {instance!.existingAttachments!.map((a) => (
+                        <li key={a.url}>
+                          <a
+                            href={a.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={a.label}
+                            className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 break-all"
+                          >
+                            <AttachmentKindIcon kind={a.kind} />
+                            <span>{a.label}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-[11px] text-muted-foreground">
+                      Choosing new files and saving replaces all current attachments.
+                    </p>
+                  </div>
+                )}
             </div>
           </div>
 
@@ -327,6 +418,40 @@ const HearingForm = ({
             )}
           </div>
 
+          {(submitPhase === "upload" || submitPhase === "finalize") && (
+            <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 space-y-2">
+              <p className="text-xs font-medium text-foreground">
+                {submitPhase === "finalize"
+                  ? "Processing files on server…"
+                  : uploadPercent != null && uploadPercent >= 0
+                    ? `Uploading… ${uploadPercent}%`
+                    : "Uploading…"}
+              </p>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                {submitPhase === "finalize" ? (
+                  <div
+                    className="h-full w-full bg-primary-green/70 animate-pulse"
+                    aria-hidden
+                  />
+                ) : (
+                  <div
+                    className={cn(
+                      "h-full bg-primary-green transition-[width] duration-150 ease-out",
+                      uploadPercent === -1 && "w-1/3 animate-pulse"
+                    )}
+                    style={
+                      uploadPercent != null && uploadPercent >= 0
+                        ? { width: `${uploadPercent}%` }
+                        : undefined
+                    }
+                    aria-valuenow={uploadPercent != null && uploadPercent >= 0 ? uploadPercent : undefined}
+                    role="progressbar"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
           <DialogFooter className="gap-2">
             <Button
               type="button"
@@ -334,6 +459,8 @@ const HearingForm = ({
               onClick={() => {
                 form.reset();
                 setFilePreview(null);
+                setSubmitPhase("idle");
+                setUploadPercent(null);
                 onOpenChange(false);
               }}
               className="border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -345,7 +472,15 @@ const HearingForm = ({
               disabled={isSubmitting}
               className="bg-primary-green hover:bg-primary-green/90 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Saving..." : hearingId ? "Update" : "Create"}
+              {isSubmitting
+                ? submitPhase === "finalize"
+                  ? "Processing…"
+                  : submitPhase === "upload"
+                    ? "Uploading…"
+                    : "Saving…"
+                : hearingId
+                  ? "Update"
+                  : "Create"}
             </Button>
           </DialogFooter>
         </form>
