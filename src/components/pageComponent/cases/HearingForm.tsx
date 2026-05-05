@@ -177,7 +177,7 @@ const HearingForm = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {hearingId ? "Edit Hearing" : "New Hearing"}

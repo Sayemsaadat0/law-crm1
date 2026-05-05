@@ -1,5 +1,11 @@
 export type TCaseStage = "Active" | "Disposed" | "Resolve" | "Archive";
 
+export type HearingFile = {
+  url: string;
+  original_name?: string;
+  mime?: string;
+};
+
 export type Hearing = {
   /** Present when loaded from API; used for edit/update */
   id?: number;
@@ -7,8 +13,8 @@ export type Hearing = {
   serial_no: string;
   hearing_date: string; // ISO date string (yyyy-mm-dd)
   details: string;
-  // Can be a single URL (string) or an array of URLs (for multiple files)
-  file?: string | string[];
+  // Can be a single URL (string), an array of URLs, or an array of file objects
+  file?: string | string[] | HearingFile[];
 };
 
 export type Payment = {

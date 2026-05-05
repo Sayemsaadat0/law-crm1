@@ -497,29 +497,6 @@ export default function CaseDetails() {
                 </div>
               )}
           </div>
-        </div>
-
-        {/* Right Sidebar - Payment and Timeline */}
-        <div className="space-y-6">
-          {/* Payment Panel Component */}
-          <PaymentPanel
-            payments={caseData.payments}
-            onAddPayment={() => {
-              setSelectedPayment(undefined);
-              setPaymentDialogOpen(true);
-            }}
-            onEditPayment={(payment: {
-              paid_date: string;
-              paid_amount: number;
-            }) => {
-              setSelectedPayment({
-                date: payment.paid_date,
-                payment_for_hearing: "",
-                amount: payment.paid_amount,
-              });
-              setPaymentDialogOpen(true);
-            }}
-          />
 
           {/* Case Timeline Component */}
           <CaseTimeline
@@ -544,6 +521,31 @@ export default function CaseDetails() {
               setHearingDialogOpen(true);
             }}
           />
+        </div>
+
+        {/* Right Sidebar - Payment and Timeline */}
+        <div className="space-y-6">
+          {/* Payment Panel Component */}
+          <PaymentPanel
+            payments={caseData.payments}
+            onAddPayment={() => {
+              setSelectedPayment(undefined);
+              setPaymentDialogOpen(true);
+            }}
+            onEditPayment={(payment: {
+              paid_date: string;
+              paid_amount: number;
+            }) => {
+              setSelectedPayment({
+                date: payment.paid_date,
+                payment_for_hearing: "",
+                amount: payment.paid_amount,
+              });
+              setPaymentDialogOpen(true);
+            }}
+          />
+
+
         </div>
       </div>
 
