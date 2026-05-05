@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Plus, Pencil, FileText, Download, ImageIcon, FileIcon, ChevronDown, ChevronUp, Eye } from "lucide-react";
+import { Plus, Pencil, FileText, Download, ImageIcon, FileIcon, ChevronDown, ChevronUp, Eye, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { compareDateWithToday, formatDisplayDate, formatDisplayDateTime } from "@/lib/utils";
 import type { Hearing, HearingFile } from "@/types/case.type";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+// import type { NormalizedHearingAttachment } from "@/lib/hearing-files";
 // import { X } from "lucide-react";
 
 interface CaseTimelineProps {
@@ -14,7 +15,24 @@ interface CaseTimelineProps {
   courtName: string;
   onAddHearing: () => void;
   onEditHearing: (hearing: Hearing) => void;
+  onDeleteHearing?: (hearing: Hearing) => void;
 }
+
+// function KindIcon({ kind }: { kind: NormalizedHearingAttachment["kind"] }) {
+//   switch (kind) {
+//     case "image":
+//       return <ImageIcon className="w-3 h-3 shrink-0" aria-hidden />;
+//     case "video":
+//       return <Video className="w-3 h-3 shrink-0" aria-hidden />;
+//     case "pdf":
+//     case "document":
+//       return <FileText className="w-3 h-3 shrink-0" aria-hidden />;
+//     case "archive":
+//       return <FileArchive className="w-3 h-3 shrink-0" aria-hidden />;
+//     default:
+//       return <Paperclip className="w-3 h-3 shrink-0" aria-hidden />;
+//   }
+// }
 
 const AttachmentList = ({ files, onPreview }: { files: HearingFile[], onPreview: (file: HearingFile) => void }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -256,6 +274,7 @@ export default function CaseTimeline({
   courtName,
   onAddHearing,
   onEditHearing,
+  // onDeleteHearing,
 }: CaseTimelineProps) {
   const [previewFile, setPreviewFile] = useState<HearingFile | null>(null);
 
@@ -317,14 +336,16 @@ export default function CaseTimeline({
 
             // Get background color based on date status
             const getBackgroundColor = () => {
-              if (dateStatus === 'today') {
-                return 'bg-blue-50';
-              } else if (dateStatus === 'past') {
-                return 'bg-red-50';
-              } else {
-                return 'bg-primary-green/20';
+              if (dateStatus === "today") {
+                return "bg-blue-50";
               }
+              if (dateStatus === "past") {
+                return "bg-red-50";
+              }
+              return "bg-primary-green/20";
             };
+
+            // const attachments = normalizeHearingAttachments(hearing.file);
 
             return (
               <div
@@ -410,4 +431,3 @@ export default function CaseTimeline({
     </div>
   );
 }
-

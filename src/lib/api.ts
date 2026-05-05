@@ -12,6 +12,17 @@ export interface ApiResponse<T = any> {
   token_type?: string;
 }
 
+/** `percent` 0–100 when known; `-1` when the browser did not report total size. */
+export type UploadProgressPayload = {
+  loaded: number;
+  total: number;
+  percent: number;
+};
+
+/** Nginx / PHP reject the body before Laravel runs (common on large or slow uploads). */
+const HTTP_413_BODY_LIMIT_MESSAGE =
+  "Upload rejected (HTTP 413): the server’s request size limit is too small. On the API host, raise nginx client_max_body_size (e.g. 512m) and PHP post_max_size / upload_max_filesize — see law-farm-backend deploy/nginx-backend-uploads.conf and public/.user.ini.";
+
 class ApiClient {
   private baseURL: string;
 
@@ -45,6 +56,11 @@ class ApiClient {
         ...options,
         headers,
       });
+
+      if (response.status === 413) {
+        await response.text().catch(() => undefined);
+        throw new Error(HTTP_413_BODY_LIMIT_MESSAGE);
+      }
 
       // Check if response has content before parsing JSON
       const contentType = response.headers.get('content-type');
@@ -128,6 +144,11 @@ class ApiClient {
         body: formData,
       });
 
+      if (response.status === 413) {
+        await response.text().catch(() => undefined);
+        throw new Error(HTTP_413_BODY_LIMIT_MESSAGE);
+      }
+
       // Check if response has content before parsing JSON
       const contentType = response.headers.get('content-type');
       let data: ApiResponse<T>;
@@ -176,6 +197,11 @@ class ApiClient {
         body: formData,
       });
 
+      if (response.status === 413) {
+        await response.text().catch(() => undefined);
+        throw new Error(HTTP_413_BODY_LIMIT_MESSAGE);
+      }
+
       // Check if response has content before parsing JSON
       const contentType = response.headers.get('content-type');
       let data: ApiResponse<T>;
@@ -204,6 +230,93 @@ class ApiClient {
     }
   }
 
+  /** POST multipart with XMLHttpRequest so `upload.onprogress` can report bytes sent. */
+  async postFormDataWithProgress<T>(
+    endpoint: string,
+    formData: FormData,
+    onProgress?: (payload: UploadProgressPayload) => void,
+  ): Promise<ApiResponse<T>> {
+    return this.requestFormDataWithProgress<T>("POST", endpoint, formData, onProgress);
+  }
+
+  /** PUT multipart with upload progress (same as postFormDataWithProgress but PUT). */
+  async putMultipartWithProgress<T>(
+    endpoint: string,
+    formData: FormData,
+    onProgress?: (payload: UploadProgressPayload) => void,
+  ): Promise<ApiResponse<T>> {
+    return this.requestFormDataWithProgress<T>("PUT", endpoint, formData, onProgress);
+  }
+
+  private requestFormDataWithProgress<T>(
+    method: "POST" | "PUT",
+    endpoint: string,
+    formData: FormData,
+    onProgress?: (payload: UploadProgressPayload) => void,
+  ): Promise<ApiResponse<T>> {
+    const token = this.getAuthToken();
+    const url = `${this.baseURL}${endpoint}`;
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open(method, url);
+      xhr.setRequestHeader("Accept", "application/json");
+      if (token) {
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      }
+
+      xhr.upload.onprogress = (ev) => {
+        if (!onProgress) {
+          return;
+        }
+        if (ev.lengthComputable && ev.total > 0) {
+          onProgress({
+            loaded: ev.loaded,
+            total: ev.total,
+            percent: Math.min(100, Math.round((ev.loaded / ev.total) * 100)),
+          });
+        } else {
+          onProgress({ loaded: ev.loaded, total: 0, percent: -1 });
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 413) {
+          reject(new Error(HTTP_413_BODY_LIMIT_MESSAGE));
+          return;
+        }
+
+        const contentType = xhr.getResponseHeader("content-type");
+        let data: ApiResponse<T>;
+
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            data = JSON.parse(xhr.responseText) as ApiResponse<T>;
+          } catch {
+            reject(new Error("Invalid JSON response from server"));
+            return;
+          }
+        } else {
+          reject(new Error(xhr.responseText || "An error occurred"));
+          return;
+        }
+
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new Error(data.message || `HTTP error! status: ${xhr.status}`));
+          return;
+        }
+
+        resolve(data);
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("Network error occurred"));
+      };
+
+      xhr.send(formData);
+    });
+  }
+
   /** PUT with multipart body (e.g. Laravel case-hearing update with files). */
   async putMultipart<T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> {
     const token = this.getAuthToken();
@@ -223,6 +336,11 @@ class ApiClient {
         body: formData,
         headers,
       });
+
+      if (response.status === 413) {
+        await response.text().catch(() => undefined);
+        throw new Error(HTTP_413_BODY_LIMIT_MESSAGE);
+      }
 
       const contentType = response.headers.get('content-type');
       let data: ApiResponse<T>;
@@ -375,6 +493,7 @@ export const usersApi = {
 // Cases API endpoints
 export interface CaseListItem {
   id: number;
+  number_of_file: string;
   number_of_case: string;
   file_number?: string;
   stages: string; // 'active' | 'disposed' | 'archive' | 'left'
@@ -444,6 +563,22 @@ export interface CasesResponse {
   };
 }
 
+/** Body for `POST /cases` — file and case identifiers are strings (varchar), max 255 on the server. */
+export interface CaseCreatePayload {
+  number_of_file: string;
+  number_of_case: string;
+  date?: string | null;
+  lawyer_id?: number;
+  court_id?: number;
+  status?: string;
+  stages?: string | null;
+  appellant_name?: string;
+  appellant_relation?: string;
+  respondent_name?: string;
+  respondent_relation?: string;
+  description?: string | null;
+}
+
 export const casesApi = {
   getAll: (params?: {
     search?: string;
@@ -479,7 +614,7 @@ export const casesApi = {
 
   getById: (id: number) => api.get<{ data: CaseListItem }>(`/cases/${id}/with-all-details`),
 
-  create: (data: any) => api.post<{ data: CaseListItem }>('/cases', data),
+  create: (data: CaseCreatePayload) => api.post<{ data: CaseListItem }>('/cases', data),
 
   update: (id: number, data: any) => api.put<{ data: CaseListItem }>(`/cases/${id}`, data),
 
@@ -535,18 +670,59 @@ export interface CaseHearing {
   serial_number?: string;
   date: string;
   note?: string;
-  file?: string;
+  file?: string | null;
+  attachments_status?: string;
+  attachments_error?: string | null;
   case_id: number;
 }
 
 export const caseHearingsApi = {
+  get: (id: number) => api.get<CaseHearing>(`/case-hearings/${id}`),
+
   // Uses multipart/form-data because of optional file upload
   create: (formData: FormData) =>
-    api.postFormData<{ data: CaseHearing }>('/case-hearings', formData),
+    api.postFormData<CaseHearing>('/case-hearings', formData),
+
+  createWithProgress: (
+    formData: FormData,
+    onProgress?: (payload: UploadProgressPayload) => void,
+  ) => api.postFormDataWithProgress<CaseHearing>("/case-hearings", formData, onProgress),
 
   update: (id: number, formData: FormData) =>
-    api.putMultipart<{ data: CaseHearing }>(`/case-hearings/${id}`, formData),
+    api.putMultipart<CaseHearing>(`/case-hearings/${id}`, formData),
+
+  updateWithProgress: (
+    id: number,
+    formData: FormData,
+    onProgress?: (payload: UploadProgressPayload) => void,
+  ) => api.putMultipartWithProgress<CaseHearing>(`/case-hearings/${id}`, formData, onProgress),
+
+  delete: (id: number) => api.delete<void>(`/case-hearings/${id}`),
 };
+
+/** Poll until hearing attachments leave `pending` (queue worker processes job). */
+export async function waitForCaseHearingAttachmentsReady(
+  hearingId: number,
+  onPoll?: (info: { attempt: number; status: string }) => void,
+): Promise<void> {
+  for (let attempt = 0; attempt < 120; attempt++) {
+    const res = await caseHearingsApi.get(hearingId);
+    const h = res.data;
+    if (!h || typeof h.id !== "number") {
+      throw new Error("Hearing not found while waiting for attachments.");
+    }
+    const status = h.attachments_status ?? "ready";
+    onPoll?.({ attempt: attempt + 1, status });
+    if (h.attachments_status === "failed") {
+      throw new Error(h.attachments_error || "Attachment processing failed.");
+    }
+    if (h.attachments_status !== "pending") {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error("Attachment processing timed out.");
+}
 
 // Case Payments API endpoints
 export interface CasePayment {

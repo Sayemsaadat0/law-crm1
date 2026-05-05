@@ -19,16 +19,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { CaseStageBadge } from "./CaseStageBadge";
 import { formatDisplayDate } from "@/lib/utils";
+import { normalizeHearingAttachments } from "@/lib/hearing-files";
 
 interface CaseDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   caseData: TCase | null;
-}
-
-function getFirstFileUrl(file?: string | string[]) {
-  if (!file) return undefined;
-  return Array.isArray(file) ? file[0] : file;
 }
 
 export function CaseDetailsModal({
@@ -177,7 +173,7 @@ export function CaseDetailsModal({
               />
             ) : (
               caseData.hearings.map((h, i) => {
-                const fileUrl = getFirstFileUrl(h.file);
+                const attachments = normalizeHearingAttachments(h.file);
                 return (
                   <div
                     key={i}
@@ -188,16 +184,24 @@ export function CaseDetailsModal({
                     </p>
                     <p className="text-muted-foreground mt-1">{h.details}</p>
 
-                    {fileUrl && (
-                      <a
-                        href={fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-2 text-sm font-semibold text-primary hover:underline"
-                      >
-                        <FileText className="w-4 h-4" /> View File
-                      </a>
-                    )}
+                    {attachments.length > 0 ? (
+                      <ul className="mt-2 space-y-1">
+                        {attachments.map((a) => (
+                          <li key={a.url}>
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download={a.label}
+                              className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline break-all"
+                            >
+                              <FileText className="w-4 h-4 shrink-0" />
+                              {a.label}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                 );
               })

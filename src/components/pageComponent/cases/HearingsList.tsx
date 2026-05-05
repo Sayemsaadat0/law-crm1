@@ -1,19 +1,34 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { FileArchive, FileText, Image as ImageIcon, Paperclip, Video } from "lucide-react";
 import type { Hearing } from "@/types/case.type";
 import { formatDisplayDate } from "@/lib/utils";
+import {
+  normalizeHearingAttachments,
+  type NormalizedHearingAttachment,
+} from "@/lib/hearing-files";
 
 interface HearingsListProps {
   hearings: Hearing[];
 }
 
-export default function HearingsList({ hearings }: HearingsListProps) {
-  const getFirstFileUrl = (file?: string | string[]) => {
-    if (!file) return undefined;
-    return Array.isArray(file) ? file[0] : file;
-  };
+function KindIcon({ kind }: { kind: NormalizedHearingAttachment["kind"] }) {
+  switch (kind) {
+    case "image":
+      return <ImageIcon className="w-4 h-4 shrink-0" aria-hidden />;
+    case "video":
+      return <Video className="w-4 h-4 shrink-0" aria-hidden />;
+    case "pdf":
+    case "document":
+      return <FileText className="w-4 h-4 shrink-0" aria-hidden />;
+    case "archive":
+      return <FileArchive className="w-4 h-4 shrink-0" aria-hidden />;
+    default:
+      return <Paperclip className="w-4 h-4 shrink-0" aria-hidden />;
+  }
+}
 
+export default function HearingsList({ hearings }: HearingsListProps) {
   return (
     <div className="mb-6">
       <h3 className="text-sm font-semibold text-gray-700 uppercase mb-3">Hearings</h3>
@@ -34,13 +49,13 @@ export default function HearingsList({ hearings }: HearingsListProps) {
                 Details
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                File
+                Files
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {hearings.map((hearing, index) => {
-              const fileUrl = getFirstFileUrl(hearing.file);
+              const attachments = normalizeHearingAttachments(hearing.file);
               return (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-900 font-medium">
@@ -52,20 +67,25 @@ export default function HearingsList({ hearings }: HearingsListProps) {
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {formatDisplayDate(hearing.hearing_date)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {hearing.details}
-                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{hearing.details}</td>
                   <td className="px-4 py-3 text-sm">
-                    {fileUrl ? (
-                      <a
-                        href={fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                      >
-                        <FileText className="w-4 h-4" />
-                        View File
-                      </a>
+                    {attachments.length > 0 ? (
+                      <ul className="space-y-1.5">
+                        {attachments.map((a) => (
+                          <li key={a.url}>
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download={a.label}
+                              className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 break-all"
+                            >
+                              <KindIcon kind={a.kind} />
+                              <span>{a.label}</span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
                     ) : (
                       <span className="text-gray-400">No file</span>
                     )}
@@ -79,4 +99,3 @@ export default function HearingsList({ hearings }: HearingsListProps) {
     </div>
   );
 }
-

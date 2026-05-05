@@ -15,7 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays } from "lucide-react";
 import { toast } from "sonner";
-import { caseHearingsApi, casesApi } from "@/lib/api";
+import { caseHearingsApi, casesApi, waitForCaseHearingAttachmentsReady } from "@/lib/api";
 
 /** All fields optional at validation time; title + date required only when saving a hearing. */
 const hearingCreateSchema = z.object({
@@ -52,6 +52,8 @@ const CaseHearingCreateForm = ({
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [submitPhase, setSubmitPhase] = useState<"idle" | "upload" | "finalize">("idle");
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
 
   const form = useForm<HearingCreateFormType>({
     resolver: zodResolver(hearingCreateSchema),
@@ -68,6 +70,8 @@ const CaseHearingCreateForm = ({
     if (!isActive) {
       form.reset();
       setFilePreview(null);
+      setSubmitPhase("idle");
+      setUploadPercent(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
@@ -141,7 +145,9 @@ const CaseHearingCreateForm = ({
       }
 
       setIsSubmitting(true);
-      toastId = toast.loading("Saving hearing information...");
+      setSubmitPhase("upload");
+      setUploadPercent(0);
+      toastId = toast.loading("Saving hearing information…");
 
       const formData = new FormData();
       formData.append("title", data.title.trim());
@@ -167,7 +173,37 @@ const CaseHearingCreateForm = ({
         });
       }
 
-      await caseHearingsApi.create(formData);
+      let lastToastAt = 0;
+      const hearingRes = await caseHearingsApi.createWithProgress(formData, (p) => {
+        if (p.percent >= 0) {
+          setUploadPercent(p.percent);
+          const now = Date.now();
+          if (now - lastToastAt > 200 && toastId !== undefined) {
+            lastToastAt = now;
+            toast.loading(`Uploading… ${p.percent}%`, { id: toastId });
+          }
+        } else {
+          setUploadPercent(-1);
+          if (toastId !== undefined) {
+            toast.loading("Uploading…", { id: toastId });
+          }
+        }
+      });
+      const hearing = hearingRes.data;
+      if (hearing?.id && hearing.attachments_status === "pending") {
+        setSubmitPhase("finalize");
+        setUploadPercent(null);
+        if (toastId !== undefined) {
+          toast.loading("Processing files on server…", { id: toastId });
+        }
+        await waitForCaseHearingAttachmentsReady(hearing.id, ({ attempt }) => {
+          if (toastId !== undefined) {
+            toast.loading(`Processing files on server… (${attempt})`, { id: toastId });
+          }
+        });
+      }
+      setSubmitPhase("idle");
+      setUploadPercent(null);
 
       if (mode === "addAnother") {
         if (toastId !== undefined) {
@@ -225,6 +261,8 @@ const CaseHearingCreateForm = ({
         toast.error(message);
       }
     } finally {
+      setSubmitPhase("idle");
+      setUploadPercent(null);
       setIsSubmitting(false);
     }
   };
@@ -294,10 +332,12 @@ const CaseHearingCreateForm = ({
             id="file"
             type="file"
             multiple
-            accept=".pdf,.jpg,.jpeg,.png"
             className="w-full h-10 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-green file:text-gray-900 hover:file:bg-primary-green/90"
             onChange={handleFileChange}
           />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Each file (including video): max 100 MB. Larger uploads are rejected by the server.
+          </p>
           {filePreview && <p className="text-xs text-gray-500 mt-1">{filePreview}</p>}
         </div>
       </div>
@@ -373,6 +413,36 @@ const CaseHearingCreateForm = ({
         )}
       </div>
 
+      {(submitPhase === "upload" || submitPhase === "finalize") && (
+        <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 space-y-2">
+          <p className="text-xs font-medium text-foreground">
+            {submitPhase === "finalize"
+              ? "Processing files on server…"
+              : uploadPercent != null && uploadPercent >= 0
+                ? `Uploading… ${uploadPercent}%`
+                : "Uploading…"}
+          </p>
+          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+            {submitPhase === "finalize" ? (
+              <div className="h-full w-full bg-primary-green/70 animate-pulse" aria-hidden />
+            ) : (
+              <div
+                className={cn(
+                  "h-full bg-primary-green transition-[width] duration-150 ease-out",
+                  uploadPercent === -1 && "w-1/3 animate-pulse"
+                )}
+                style={
+                  uploadPercent != null && uploadPercent >= 0
+                    ? { width: `${uploadPercent}%` }
+                    : undefined
+                }
+                role="progressbar"
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="pt-2 flex flex-col space-y-3">
         <Button
           type="button"
@@ -380,14 +450,26 @@ const CaseHearingCreateForm = ({
           onClick={handleSubmitAddAnother}
           className="w-full bg-black text-white hover:bg-black/90 font-medium h-10 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Saving..." : "Save & add another hearing"}
+          {isSubmitting
+            ? submitPhase === "finalize"
+              ? "Processing…"
+              : submitPhase === "upload"
+                ? "Uploading…"
+                : "Saving…"
+            : "Save & add another hearing"}
         </Button>
         <Button
           type="submit"
           disabled={!isActive || isSubmitting}
           className="w-full bg-primary-green hover:bg-primary-green/90 text-gray-900 font-medium h-10 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Saving..." : "Save & complete"}
+          {isSubmitting
+            ? submitPhase === "finalize"
+              ? "Processing…"
+              : submitPhase === "upload"
+                ? "Uploading…"
+                : "Saving…"
+            : "Save & complete"}
         </Button>
       </div>
     </form>

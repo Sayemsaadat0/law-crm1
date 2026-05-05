@@ -28,10 +28,11 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 
-import type { TCase, TCaseStage } from "@/types/case.type";
+import type { Hearing, TCase, TCaseStage } from "@/types/case.type";
 import {
   casesApi,
   caseClientsApi,
+  caseHearingsApi,
   courtsApi,
   usersApi,
   type CaseListItem,
@@ -44,6 +45,10 @@ import PaymentPanel from "@/components/pageComponent/cases/PaymentPanel";
 import CaseTimeline from "@/components/pageComponent/cases/CaseTimeline";
 import PaymentForm from "@/components/pageComponent/cases/PaymentForm";
 import HearingForm from "@/components/pageComponent/cases/HearingForm";
+import {
+  normalizeHearingAttachments,
+  type NormalizedHearingAttachment,
+} from "@/lib/hearing-files";
 import { toast } from "sonner";
 
 // ---------- helpers ----------
@@ -203,8 +208,8 @@ const mapApiCaseToTCase = (apiCase: CaseListItem): TCase => {
 
 const caseSchema = z.object({
   date: z.string().optional(),
-  number_of_file: z.string().min(1, "File number is required"),
-  number_of_case: z.string().min(1, "Case number is required"),
+  number_of_file: z.string().min(1, "File number is required").max(255, "Max 255 characters"),
+  number_of_case: z.string().min(1, "Case number is required").max(255, "Max 255 characters"),
   status: z.enum(["active", "disposed", "resolve", "archive"]).optional(),
   stage: z.string().optional(),
   court_id: z.string().min(1, "Court is required"),
@@ -261,7 +266,7 @@ export default function CaseEdit() {
         serial_no: string;
         date: string;
         note: string;
-        file?: string;
+        existingAttachments?: NormalizedHearingAttachment[];
       }
     | undefined
   >(undefined);
@@ -368,8 +373,8 @@ export default function CaseEdit() {
       const toastId = toast.loading("Updating case details...");
       await casesApi.update(Number(id), {
         date: values.date || null,
-        number_of_file: values.number_of_file,
-        number_of_case: values.number_of_case,
+        number_of_file: values.number_of_file.trim(),
+        number_of_case: values.number_of_case.trim(),
         status: values.status || null,
         stages: values.stage || null,
         court_id: Number(values.court_id),
@@ -435,6 +440,35 @@ export default function CaseEdit() {
   const handleHearingCreated = () => {
     fetchCase();
   };
+
+  const handleDeleteHearing = useCallback(
+    async (hearing: Hearing) => {
+      if (hearing.id == null) {
+        return;
+      }
+      const label = hearing.title?.trim() || "this hearing";
+      if (
+        !window.confirm(
+          `Delete "${label}"? This removes the hearing and its attachments. This cannot be undone.`,
+        )
+      ) {
+        return;
+      }
+      try {
+        const toastId = toast.loading("Deleting hearing...");
+        await caseHearingsApi.delete(hearing.id);
+        toast.success("Hearing deleted.", { id: toastId });
+        if (selectedHearing?.id === hearing.id) {
+          setSelectedHearing(undefined);
+          setHearingDialogOpen(false);
+        }
+        await fetchCase();
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to delete hearing");
+      }
+    },
+    [fetchCase, selectedHearing?.id],
+  );
 
   const handlePaymentCreated = () => {
     fetchCase();
@@ -886,10 +920,11 @@ export default function CaseEdit() {
                   serial_no: hearing.serial_no,
                   date: hearing.hearing_date,
                   note: hearing.details,
-                  file: Array.isArray(hearing.file) ? hearing.file[0] : hearing.file,
+                  existingAttachments: normalizeHearingAttachments(hearing.file),
                 });
                 setHearingDialogOpen(true);
               }}
+              onDeleteHearing={handleDeleteHearing}
             />
           </div>
         </div>
